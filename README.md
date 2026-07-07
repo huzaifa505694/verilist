@@ -1,146 +1,58 @@
-# VeriList — Week 2: Authentication & Database Design
+[README.md](https://github.com/user-attachments/files/29753391/README.md)
+# VeriList — Week 3: Core Backend APIs & CRUD Operations
 
-**AI-Verified Pricing & Trust for Secondhand Marketplaces**
-*Tynovate Internship Program 2026 — AI + Web Development Track*
+Tynovate Internship Program 2026 — AI + Web Development Track
+Author: Huzaifa | CFD Campus, National University (NU)
 
-**Status:** In Progress&nbsp;&nbsp;|&nbsp;&nbsp;**Stack:** Next.js · Prisma · PostgreSQL · NextAuth.js&nbsp;&nbsp;|&nbsp;&nbsp;**Week:** 2 of 8
+## Week 3 Goal
 
----
+Every core entity in VeriList has a complete, tested set of REST endpoints for Create, Read, Update, and Delete (CRUD) — the functional foundation that the dashboards (Week 4), AI Price Estimator (Week 5), and Fraud Detector (Week 6) are all built on top of.
 
-## 🎯 Week 2 Goal
+Status: **Completed**, on schedule.
 
-> A user can register, log in (via credentials **or** Google), log out, and stay logged in across page refreshes. The full database schema is migrated and seeded with realistic fake data.
+## What Was Built
 
----
+### Listings CRUD
+- `POST /listings` — create a listing, with category-specific field validation
+- `GET /listings` — paginated listing feed with filters (category, price range, condition)
+- `GET /listings/:id` — single listing detail
+- `PUT /listings/:id` — update a listing, restricted to the owning seller
+- `DELETE /listings/:id` — soft delete (status set to `removed`, no hard delete)
 
-## 📦 What This Week Covers
+### Supporting Entities
+- Reviews — create and read endpoints
+- Notifications — read and mark-as-read endpoints
+- Admin endpoints — list all users, list all listings including flagged ones
 
-| Area | Deliverable |
-|---|---|
-| Database Schema | Full Prisma schema migrated to PostgreSQL, indexed for query performance |
-| Seed Data | ~30–50 fake users and ~100 fake vehicle listings (Faker.js) for downstream AI training |
-| Credentials Auth | Registration, login, logout — bcrypt hashing, JWT via httpOnly cookies |
-| **Google OAuth** | Sign-in with Google via **NextAuth.js + Prisma Adapter** |
-| Role-Based Access | `buyer` / `seller` / `admin` roles with middleware enforcement |
-| Frontend Integration | Login/Register forms wired to backend, full register → login → protected route → logout loop verified |
+### Validation, Error Handling & Rate Limiting
+- Input validation on all write endpoints (e.g. negative prices and invalid mileage are rejected at the API level, not just the frontend)
+- Centralized error-handling middleware with a consistent error response shape
+- Basic rate limiting on authentication and listing-creation endpoints
 
----
+### Testing
+- Postman collection covering every endpoint, with at least one success and one failure case each
+- Bugs found during testing were fixed
+- Postman collection exported to `docs/` for the final submission package
 
-## 🗄️ 1. Database Schema & Seeding
+## Endpoint Summary
 
-- [x] Migrate full Prisma schema to PostgreSQL
-- [x] `Role` enum: `BUYER` / `SELLER` / `ADMIN`
-- [x] Core models: `User`, `Listing` (+ relations for future `PricePredictions`, `FraudScores`)
-- [x] Seed script (Faker.js): ~30–50 users, ~100 vehicle listings with varied mileage / year / price
-- [x] Indexes on `seller_id`, `category`, `status`, `created_at`
+| Method | Route | Purpose | Access |
+|---|---|---|---|
+| POST | /listings | Create a new listing | Seller |
+| GET | /listings | Paginated listing feed with filters | Public |
+| GET | /listings/:id | Single listing detail | Public |
+| PUT | /listings/:id | Update an owned listing | Seller (owner) |
+| DELETE | /listings/:id | Soft-delete a listing | Seller (owner) |
+| GET/POST | /reviews | Create / read reviews | Buyer / Public |
+| GET/PATCH | /notifications | Read / mark-as-read | User |
+| GET | /admin/users, /admin/listings | Admin oversight views | Admin |
 
-```bash
-npx prisma migrate dev --name week2_auth_schema
-npx prisma db seed
-```
+## Key Decisions
 
-> **Why seed now?** The AI Price Estimator (Week 5) needs realistic training data. Generating it in Week 2 avoids losing time later.
+- Soft-delete over hard-delete for listings, to keep historical data intact for future analytics.
+- Validation was kept strict at this stage, since clean input now prevents downstream issues for the Week 5 pricing model and Week 6 fraud detector, both of which assume clean data.
+- Every endpoint was verified individually in Postman before being marked complete.
 
----
+## Next Up — Week 4
 
-## 🔐 2. Authentication
-
-VeriList supports **two sign-in paths** that converge on the same `User` table and JWT session model:
-
-1. **Credentials path** — email + password → bcrypt hash/verify → `User` (Prisma)
-2. **Google OAuth path** — Google Cloud OAuth client → NextAuth.js → `User` (Prisma)
-
-Both paths write to the same `User` record, then issue a JWT session stored in an httpOnly cookie, which is what role-based middleware checks on every protected route. The sign-in method used has no effect on downstream authorization logic.
-
-### 2.1 Credentials Flow
-
-- [x] `POST /api/auth/register` — bcrypt password hashing
-- [x] `POST /api/auth/login` — issues JWT
-- [x] Middleware verifies JWT on protected routes
-- [x] Logout — clears httpOnly cookie (server-side blacklist optional)
-- [x] `role` field enforced via role-based middleware
-
-### 2.2 Google OAuth (NextAuth.js)
-
-- [x] Google Cloud Console → OAuth Client (Web Application) created
-- [x] Authorized redirect URI configured:
-  `http://localhost:3000/api/auth/callback/google`
-- [x] `GoogleProvider` added to NextAuth config
-- [x] `PrismaAdapter` linked so Google sign-ins create/reuse the same `User` model as credentials auth
-- [x] `Account` and `Session` models added to Prisma schema (NextAuth requirement)
-- [x] New Google sign-ups default to `role: BUYER`, upgradeable to `SELLER` post-registration
-
-```env
-# .env — never commit real values
-GOOGLE_CLIENT_ID=your_client_id
-GOOGLE_CLIENT_SECRET=your_client_secret
-NEXTAUTH_SECRET=your_generated_secret
-NEXTAUTH_URL=http://localhost:3000
-```
-
-```ts
-// pages/api/auth/[...nextauth].ts (or app/api/auth/[...nextauth]/route.ts)
-providers: [
-  GoogleProvider({
-    clientId: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  }),
-  CredentialsProvider({ /* bcrypt-verified login */ }),
-],
-adapter: PrismaAdapter(prisma),
-session: { strategy: "jwt" },
-```
-
-> **Why both methods matter:** Google OAuth removes signup friction for buyers browsing casually; credentials auth stays essential for sellers who need a persistent, portfolio-style identity with password recovery. Both converge on the same `User` and JWT session model, so downstream role checks don't need to know which path was used.
-
----
-
-## ✅ End-to-End Verification Checklist
-
-- [ ] Register with email/password → succeeds, password stored hashed
-- [ ] Login with credentials → JWT issued, session persists on refresh
-- [ ] Sign in with Google → new `User` + `Account` row created, session persists
-- [ ] Returning Google user → no duplicate `User` row created
-- [ ] Access protected route while logged out → rejected (401/redirect)
-- [ ] Access protected route while logged in → allowed
-- [ ] Logout → session cleared, protected route now rejects access
-- [ ] Role middleware blocks `buyer` from admin-only routes
-
----
-
-## ⚠️ Known Tradeoffs / Risks
-
-| Risk | Mitigation / Note |
-|---|---|
-| JWT storage in `localStorage` is XSS-vulnerable | Using **httpOnly cookies** instead — documented as deliberate choice |
-| Google OAuth users have no password | Handled by NextAuth's `Account` model; password field nullable for OAuth-only users |
-| Redirect URI mismatch is the #1 Google OAuth failure | Verify **exact** match (including trailing slash / http vs https) in Google Cloud Console |
-| Seed data must stay realistic | Directly feeds Week 5 AI Price Estimator — garbage data here breaks the model later |
-
----
-
-## 📁 Relevant Structure
-
-```
-server/ (or app/api if using Next.js API routes)
-├── prisma/
-│   ├── schema.prisma        # User, Account, Session, Listing, Role enum
-│   └── seed.ts               # Faker.js seed script
-├── api/auth/
-│   ├── register.ts
-│   ├── login.ts
-│   └── [...nextauth].ts      # Google + Credentials providers
-├── middleware/
-│   ├── verifyJWT.ts
-│   └── requireRole.ts
-└── .env                       # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NEXTAUTH_SECRET
-```
-
----
-
-## ➡️ Next: Week 3
-
-Core Backend APIs & CRUD — full Create/Read/Update/Delete for Listings, with input validation strict enough that the Week 6 Fraud Detector can trust clean data downstream.
-
----
-*Internal working document — VeriList, Tynovate Internship Program 2026*
+Wiring the Listings, Listing Detail, Seller Dashboard, and Admin Dashboard pages to this live API, followed by a full responsive pass across mobile, tablet, and desktop.
