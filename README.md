@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29753391/README.md)
 # VeriList — Week 3: Core Backend APIs & CRUD Operations
 
 Tynovate Internship Program 2026 — AI + Web Development Track
