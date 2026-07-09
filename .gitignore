@@ -1,0 +1,39 @@
+# Python Virtual Environment
+Lib/
+Scripts/
+pyvenv.cfg
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*/__pycache__/
+backend/__pycache__/
+backend/ai_models/__pycache__/
+
+# Database
+backend/verilist.db
+*.db
+*.sqlite3
+
+# Environment Variables / Credentials
+backend/.env
+.env
+.env.local
+.env.*.local
+*service-account.json
+service-account.json
+
+# Datasets (Large CSV files)
+*.csv
+car_prices.csv
+train2.csv
+
+# System/IDE Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
