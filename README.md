@@ -1,57 +1,77 @@
-# VeriList — Week 3: Core Backend APIs & CRUD Operations
+# VeriList — Week 4: Dashboard & Responsive Frontend
 
-Tynovate Internship Program 2026 — AI + Web Development Track
-Author: Huzaifa | CFD Campus, National University (NU)
+> AI-Verified Pricing & Trust for Secondhand Marketplaces
+> Tynovate Internship Program 2026 — AI + Web Development Track
 
-## Week 3 Goal
+This README covers **Week 4 only**. For the full project overview, problem statement, and 8-week roadmap, see the main project documentation in `docs/`.
 
-Every core entity in VeriList has a complete, tested set of REST endpoints for Create, Read, Update, and Delete (CRUD) — the functional foundation that the dashboards (Week 4), AI Price Estimator (Week 5), and Fraud Detector (Week 6) are all built on top of.
+---
 
-Status: **Completed**, on schedule.
+## 🎯 Week 4 Goal
 
-## What Was Built
+Deliver a working, data-driven frontend: a real user can browse listings, view full listing details, and see seller/admin dashboards populated with **live data from the backend** — fully responsive across desktop, tablet, and mobile.
 
-### Listings CRUD
-- `POST /listings` — create a listing, with category-specific field validation
-- `GET /listings` — paginated listing feed with filters (category, price range, condition)
-- `GET /listings/:id` — single listing detail
-- `PUT /listings/:id` — update a listing, restricted to the owning seller
-- `DELETE /listings/:id` — soft delete (status set to `removed`, no hard delete)
+---
 
-### Supporting Entities
-- Reviews — create and read endpoints
-- Notifications — read and mark-as-read endpoints
-- Admin endpoints — list all users, list all listings including flagged ones
+## ✅ Scope Completed This Week
 
-### Validation, Error Handling & Rate Limiting
-- Input validation on all write endpoints (e.g. negative prices and invalid mileage are rejected at the API level, not just the frontend)
-- Centralized error-handling middleware with a consistent error response shape
-- Basic rate limiting on authentication and listing-creation endpoints
+### Core Pages
+- **Listings Page** — grid/list view, category and price-range filters, pagination, wired to the live `GET /listings` API.
+- **Listing Detail Page** — full listing info, seller details, and a placeholder section for the AI price estimate and risk score (to be wired live in Weeks 5–6).
+- **Loading & error states** implemented on every API call — no silent failures, no blank screens.
 
-### Testing
-- Postman collection covering every endpoint, with at least one success and one failure case each
-- Bugs found during testing were fixed
-- Postman collection exported to `docs/` for the final submission package
+### Seller Dashboard
+- **My Listings** view — status, placeholder view count, edit/delete actions.
+- **Stats cards** — total listings, active listings, sold listings.
 
-## Endpoint Summary
+### Admin Dashboard
+- **Platform overview** — user count, listing count, category breakdown chart (Recharts).
+- **Flagged listings table** — placeholder UI, to be connected to real fraud-scoring data in Week 6.
 
-| Method | Route | Purpose | Access |
-|---|---|---|---|
-| POST | /listings | Create a new listing | Seller |
-| GET | /listings | Paginated listing feed with filters | Public |
-| GET | /listings/:id | Single listing detail | Public |
-| PUT | /listings/:id | Update an owned listing | Seller (owner) |
-| DELETE | /listings/:id | Soft-delete a listing | Seller (owner) |
-| GET/POST | /reviews | Create / read reviews | Buyer / Public |
-| GET/PATCH | /notifications | Read / mark-as-read | User |
-| GET | /admin/users, /admin/listings | Admin oversight views | Admin |
+### Responsive & Accessibility Pass
+- Verified layout at **375px (mobile)**, **768px (tablet)**, and **1440px (desktop)**.
+- Fixed common breakpoints issues: non-scrolling tables on mobile, fixed-width elements, non-collapsing navigation.
+- Basic accessibility check completed — keyboard navigation, image alt text, color contrast.
 
-## Key Decisions
+---
 
-- Soft-delete over hard-delete for listings, to keep historical data intact for future analytics.
-- Validation was kept strict at this stage, since clean input now prevents downstream issues for the Week 5 pricing model and Week 6 fraud detector, both of which assume clean data.
-- Every endpoint was verified individually in Postman before being marked complete.
+## 🧱 Tech Stack (Frontend, Week 4 scope)
 
-## Next Up — Week 4
+| Layer | Technology |
+|---|---|
+| Framework | React (Vite) |
+| Charts | Recharts |
+| API Layer | REST calls to Express backend (`/listings`, `/users`, `/admin`) |
+| Styling | Responsive CSS, mobile-first breakpoints |
+| Data Source | Live PostgreSQL-backed API — **no hardcoded/mock JSON** |
 
-Wiring the Listings, Listing Detail, Seller Dashboard, and Admin Dashboard pages to this live API, followed by a full responsive pass across mobile, tablet, and desktop.
+---
+
+## 🔌 API Integration
+
+All dashboard and listing views consume the real backend endpoints built in Week 3 (Listings, Users, Admin CRUD). Fake/hardcoded data was deliberately avoided this week — the seeded database from Week 2 is the single source of truth, so no rework is needed when AI features are wired in during Weeks 5–6.
+
+---
+
+## ⚠️ Known Limitations / Deferred to Later Weeks
+
+- AI price estimate and risk score on the Listing Detail page are **placeholders** — real predictions arrive in Week 5 (Price Estimator) and Week 6 (Fraud & Anomaly Detector).
+- Admin flagged-listings table is **not yet populated** with real fraud data — pending Week 6.
+- Seller "views count" is a placeholder pending analytics instrumentation (Week 7).
+
+---
+
+## 📋 Testing Checklist
+
+- [x] Listings page renders and filters correctly at all three breakpoints
+- [x] Listing detail page loads live data, handles missing/loading states
+- [x] Seller dashboard reflects real seeded data per logged-in user
+- [x] Admin dashboard reflects real aggregate platform data
+- [x] Navigation collapses correctly on mobile
+- [x] Keyboard navigation and alt text verified
+
+---
+
+## Next Up — Week 5
+
+AI Price Estimator: train a regression model on vehicle listing data and integrate real predicted price ranges into the listing creation flow.
