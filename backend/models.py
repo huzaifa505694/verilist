@@ -132,7 +132,7 @@ def create_listing(listing_data: dict) -> dict:
     res['id'] = doc.id
     return res
 
-def get_listings(filters: dict = None) -> list:
+def get_listings(filters: dict = None, return_total: bool = False) -> list:
     db = get_firestore_db()
     listings_ref = db.collection('listings')
     
@@ -185,6 +185,8 @@ def get_listings(filters: dict = None) -> list:
     # Order by created_at descending
     listings.sort(key=lambda x: x.get('created_at', ''), reverse=True)
     
+    total_count = len(listings)
+    
     # Page pagination offsets
     if filters:
         limit = filters.get('limit')
@@ -218,6 +220,8 @@ def get_listings(filters: dict = None) -> list:
             d['seller_name'] = 'Unknown'
             d['seller_email'] = ''
             
+    if return_total:
+        return listings, total_count
     return listings
 
 def get_listing_by_id(listing_id: str):
@@ -418,6 +422,19 @@ def update_offer_status(offer_id: str, status: str) -> bool:
     if doc.exists:
         doc_ref.update({
             'status': status
+        })
+        return True
+    return False
+
+def counter_offer(offer_id: str, counter_amount: float, last_action_by: str) -> bool:
+    db = get_firestore_db()
+    doc_ref = db.collection('offers').document(offer_id)
+    doc = doc_ref.get()
+    if doc.exists:
+        doc_ref.update({
+            'status': 'COUNTER_OFFER',
+            'counter_amount': float(counter_amount),
+            'last_action_by': last_action_by
         })
         return True
     return False
