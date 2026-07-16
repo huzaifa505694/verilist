@@ -15,10 +15,26 @@
   <link rel="stylesheet" href="/style.css">
   
   <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 
   <!-- Google Identity Services (Real OAuth) -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    window._gsiLibraryReady = false;
+    function onGsiScriptLoaded() {
+      window._gsiLibraryReady = true;
+      if (window.onGsiScriptLoadedCallback) {
+        window.onGsiScriptLoadedCallback();
+      }
+    }
+  </script>
+  <script src="https://accounts.google.com/gsi/client" onload="onGsiScriptLoaded()"></script>
+  
+  <!-- React and ReactDOM for Recharts UMD -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-is@18.2.0/umd/react-is.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/prop-types@15/prop-types.min.js" crossorigin></script>
+  <script src="https://unpkg.com/recharts/umd/Recharts.js" crossorigin></script>
 </head>
 <body>
 
@@ -50,9 +66,6 @@
             </button>
             <button class="btn btn-secondary" id="nav-browse-btn" style="padding: 0.42rem 0.9rem; font-size: 0.83rem;">
               <i data-lucide="shopping-bag" style="width:15px;height:15px;"></i> Browse
-            </button>
-            <button class="btn btn-secondary" id="nav-saved-btn" style="padding: 0.42rem 0.9rem; font-size: 0.83rem;">
-              <i data-lucide="heart" style="width:15px;height:15px;"></i> Saved
             </button>
             <div class="nav-user-info">
               <div class="user-avatar" id="nav-user-avatar">U</div>
@@ -190,6 +203,11 @@
               </svg>
               <span>Sign in with Google</span>
             </button>
+            <div style="text-align: center; margin-top: 0.6rem;">
+              <a href="#" class="google-trouble-link" style="font-size: 0.76rem; color: var(--text-secondary); text-decoration: underline; font-weight: 500;">
+                Trouble signing in with Google? Click here.
+              </a>
+            </div>
           </div>
           
           <div class="auth-footer">
@@ -265,6 +283,11 @@
               </svg>
               <span>Sign in with Google</span>
             </button>
+            <div style="text-align: center; margin-top: 0.6rem;">
+              <a href="#" class="google-trouble-link" style="font-size: 0.76rem; color: var(--text-secondary); text-decoration: underline; font-weight: 500;">
+                Trouble signing in with Google? Click here.
+              </a>
+            </div>
           </div>
           
           <div class="auth-footer">
@@ -320,13 +343,6 @@
               <span class="info-label">Session Encryption</span>
               <span class="session-status">JWT Cookied (HttpOnly)</span>
             </div>
-            <div class="info-row" id="dash-role-switch-row" style="margin-top: 1rem; border-top: 1px dashed var(--border-muted); padding-top: 0.75rem; justify-content: flex-start; gap: 0.5rem; align-items: center;">
-              <span class="info-label">Switch Role:</span>
-              <button class="btn btn-secondary" id="dash-toggle-role-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.3rem;">
-                <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i>
-                <span id="dash-toggle-role-btn-text">Switch to Seller</span>
-              </button>
-            </div>
           </div>
           
           <div class="info-card glass-card">
@@ -338,6 +354,33 @@
               <span class="status-box-text" id="dash-model-status">
                 Active AI Model: Ridge Regression Price Estimator v1.2.0-prod
               </span>
+            </div>
+          </div>
+          <!-- Seller Dashboard Specific - My Listings Section -->
+          <div id="seller-listings-container" class="hidden" style="margin-top: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+              <h4 style="font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="car" style="width:16px;height:16px;"></i>
+                <span>My Listed Vehicles</span>
+              </h4>
+              <span class="badge badge-gold" id="seller-listings-count">0 Listings</span>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; overflow-x: auto;">
+              <table class="dashboard-table" style="width:100%; border-collapse: collapse; text-align: left; min-width: 650px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">
+                    <th style="padding: 0.75rem 0.5rem;">Vehicle Spec</th>
+                    <th style="padding: 0.75rem 0.5rem;">Asking Price</th>
+                    <th style="padding: 0.75rem 0.5rem;">AI Trust Score</th>
+                    <th style="padding: 0.75rem 0.5rem;">Views</th>
+                    <th style="padding: 0.75rem 0.5rem;">Status</th>
+                    <th style="padding: 0.75rem 0.5rem; text-align: right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="seller-listings-table-body" style="font-size: 0.9rem;">
+                  <!-- Dynamic content -->
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -354,6 +397,15 @@
           <div>
             <h1 id="browse-page-title">Browse Active Listings</h1>
             <p style="color: var(--text-muted); font-size: 0.95rem;">Explore high-quality vehicles verified by regression models</p>
+          </div>
+          <!-- Grid vs List View Toggle -->
+          <div class="view-toggle-container" id="browse-view-toggle">
+            <button class="btn btn-secondary active" id="view-grid-btn" title="Grid View" aria-label="Grid View">
+              <i data-lucide="layout-grid" style="width:16px;height:16px;"></i>
+            </button>
+            <button class="btn btn-secondary" id="view-list-btn" title="List View" aria-label="List View">
+              <i data-lucide="list" style="width:16px;height:16px;"></i>
+            </button>
           </div>
         </div>
         
@@ -413,6 +465,11 @@
         <!-- Listings Feed Grid -->
         <div class="listings-grid" id="listings-feed-grid">
           <!-- Dynamic listings populated by app.js -->
+        </div>
+        
+        <!-- Listings Pagination Controls -->
+        <div class="pagination-container" id="listings-pagination">
+          <!-- Dynamically populated in app.js -->
         </div>
       </section>
       
@@ -494,37 +551,7 @@
                 <textarea id="create-desc" class="form-input" style="min-height: 120px; resize: vertical;" placeholder="Provide details about the car's history, condition, and specs. Note: Do not include external payment details or direct phone/emails as listings are scanned for transaction integrity." required></textarea>
               </div>
               
-              <!-- Live AI Prediction Section -->
-              <div class="full-width">
-                <button type="button" class="btn btn-secondary" id="get-ai-estimate-btn" style="width: 100%;">
-                  <i data-lucide="shield-check"></i>
-                  <span>Analyze Listing with AI Price Estimator</span>
-                </button>
-                
-                <div class="ai-preview-box hidden" id="ai-estimate-box">
-                  <div class="ai-preview-header">
-                    <i data-lucide="cpu" class="logo-icon"></i>
-                    <strong style="color: var(--color-secondary);">AI Evaluation Engine</strong>
-                  </div>
-                  <div class="ai-preview-stats">
-                    <div>
-                      <div class="stat-label">Predicted Fair Value</div>
-                      <div class="stat-value" id="ai-est-price" style="font-size: 1.8rem; color: var(--color-secondary);">$0</div>
-                    </div>
-                    <div>
-                      <div class="stat-label">Fair Range (Standard)</div>
-                      <div class="stat-value" id="ai-est-range" style="font-size: 1.4rem; color: var(--text-primary);">$0 - $0</div>
-                    </div>
-                    <div>
-                      <div class="stat-label">AI Trust Estimation</div>
-                      <span class="badge badge-success" id="ai-est-badge">PASSED</span>
-                    </div>
-                  </div>
-                  <p class="hub-text" style="font-size: 0.85rem; margin-top: 0.5rem;" id="ai-est-verdict">
-                    Listing price is within the predicted fair market range. Listing will go live immediately on publication.
-                  </p>
-                </div>
-              </div>
+
               
             </div>
             
@@ -543,18 +570,235 @@
             <span>Back to Dashboard</span>
           </a>
         </div>
-        <div style="margin-bottom: 2rem;">
-          <h1>AI Anomaly & Fraud Queue</h1>
-          <p style="color: var(--text-muted); font-size: 0.95rem;">Audit queue for vehicle listings flagged as anomalous or high-risk</p>
-        </div>
-        
-        <div class="glass-card" style="padding: 1.5rem;">
-          <div class="audit-list" id="admin-audit-list">
-            <!-- Populated dynamically by app.js -->
-            <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No pending listings in the audit queue.</p>
+        <!-- Admin Global Counters -->
+        <div class="stats-grid" id="admin-stats-grid" style="margin-bottom: 2rem;">
+          <div class="stat-card glass-card">
+            <i data-lucide="users" style="color: var(--color-secondary); width: 24px; height: 24px;"></i>
+            <div class="stat-value" id="admin-stat-users">0</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+          <div class="stat-card glass-card">
+            <i data-lucide="car" style="color: var(--color-primary); width: 24px; height: 24px;"></i>
+            <div class="stat-value" id="admin-stat-listings">0</div>
+            <div class="stat-label">Total Listings</div>
+          </div>
+          <div class="stat-card glass-card">
+            <i data-lucide="alert-circle" style="color: var(--color-gold); width: 24px; height: 24px;"></i>
+            <div class="stat-value" id="admin-stat-pending">0</div>
+            <div class="stat-label">Flagged listings</div>
           </div>
         </div>
+
+        <!-- Category Breakdown Recharts Section -->
+        <div class="glass-card" style="padding: 2rem; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1rem; align-items: center;">
+          <h4 class="card-header" style="width: 100%; margin-bottom: 0.5rem;">Vehicle Category Breakdown</h4>
+          <div id="admin-chart-container" style="width: 100%; min-height: 300px; display: flex; justify-content: center; align-items: center;">
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Initializing analytics engine charts...</p>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-end;">
+          <div>
+            <h2>Flagged Listings Audit Table</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Review flagged anomalous pricing and verify credentials</p>
+          </div>
+          <div id="admin-category-filter-indicator" class="hidden" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+            <span class="badge badge-blue" id="admin-filtered-category-badge">VEHICLES</span>
+            <a href="#" id="admin-clear-filter-btn" style="font-size: 0.8rem; color: var(--color-rose); text-decoration: underline; font-weight: 600;">Clear Filter</a>
+          </div>
+        </div>
+        <div class="glass-card" style="padding: 1.5rem; overflow-x: auto;">
+          <table class="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; min-width: 800px;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">
+                <th style="padding: 0.75rem 0.5rem;">Listing details</th>
+                <th style="padding: 0.75rem 0.5rem;">Seller info</th>
+                <th style="padding: 0.75rem 0.5rem;">Price & AI limits</th>
+                <th style="padding: 0.75rem 0.5rem;">AI Rating / Flags</th>
+                <th style="padding: 0.75rem 0.5rem; text-align: right;">Audit actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-audit-table-body" style="font-size: 0.88rem;">
+              <tr style="border-bottom: 1px solid var(--border-subtle);">
+                <td style="padding: 1rem 0.5rem; font-weight: 600;">
+                  2017 Honda Accord Sport
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-top: 0.15rem;">
+                    Suspiciously low price combined with low mileage indicating potential odometer rollback.
+                  </div>
+                </td>
+                <td style="padding: 1rem 0.5rem; color: var(--text-secondary);">
+                  <div>David Seller</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">david@example.com</div>
+                </td>
+                <td style="padding: 1rem 0.5rem;">
+                  <div style="font-weight: 700; color: var(--color-rose);">$8,500</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+                    AI Range: $13,200 - $15,800
+                  </div>
+                </td>
+                <td style="padding: 1rem 0.5rem;">
+                  <div style="margin-bottom: 0.25rem;"><span class="badge badge-danger" style="font-weight: 700;">45% Trust</span></div>
+                  <div><span class="badge badge-danger" style="font-size: 0.7rem;">Low Price</span></div>
+                </td>
+                <td style="padding: 1rem 0.5rem; text-align: right; color: var(--text-muted); font-style: italic;">
+                  [Wired in Week 6]
+                </td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-subtle);">
+                <td style="padding: 1rem 0.5rem; font-weight: 600;">
+                  2020 Tesla Model Y Long Range
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-top: 0.15rem;">
+                    Listing description contains suspicious off-platform payment links.
+                  </div>
+                </td>
+                <td style="padding: 1rem 0.5rem; color: var(--text-secondary);">
+                  <div>Elon Mock</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">mock@example.com</div>
+                </td>
+                <td style="padding: 1rem 0.5rem;">
+                  <div style="font-weight: 700; color: var(--color-rose);">$32,000</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+                    AI Range: $31,500 - $36,000
+                  </div>
+                </td>
+                <td style="padding: 1rem 0.5rem;">
+                  <div style="margin-bottom: 0.25rem;"><span class="badge badge-warning" style="font-weight: 700;">68% Trust</span></div>
+                  <div><span class="badge badge-danger" style="font-size: 0.7rem;">Suspicious Text</span></div>
+                </td>
+                <td style="padding: 1rem 0.5rem; text-align: right; color: var(--text-muted); font-style: italic;">
+                  [Wired in Week 6]
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
+
+      <!-- 4. DEDICATED DETAIL PAGE -->
+      <section id="detail-page" class="page-section hidden">
+        <div style="margin-bottom: 1.25rem;">
+          <a href="#" class="back-to-browse-link" id="detail-back-link" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">
+            <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+            <span id="detail-back-text">Back to Browse</span>
+          </a>
+        </div>
+        
+        <div class="modal-content-grid glass-panel" style="border-radius: var(--radius-lg); margin-top: 1rem;">
+          <div class="modal-left">
+            <div>
+              <span class="badge badge-info" id="detail-category">VEHICLES</span>
+              <h1 id="detail-title" style="margin-top: 0.5rem; font-size: 2rem;">2018 Toyota Camry</h1>
+              <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Posted on <span id="detail-date">June 2026</span>
+              </p>
+            </div>
+            
+            <div class="listing-image-placeholder" style="height: 280px; border-radius: var(--radius-md);">
+              <i data-lucide="car" style="width: 64px; height: 64px; opacity: 0.3;"></i>
+            </div>
+            
+            <div>
+              <h3>Description</h3>
+              <p id="detail-description" style="margin-top: 0.5rem; line-height: 1.6; font-size: 0.95rem;">
+                Detailed vehicle description goes here.
+              </p>
+            </div>
+          </div>
+          
+          <div class="modal-right">
+            <div>
+              <div class="stat-label">Asking Price</div>
+              <div class="listing-price" id="detail-price" style="font-size: 2.2rem; color: var(--text-primary);">$15,000</div>
+            </div>
+            
+            <div class="glass-card" style="padding: 1.25rem; border-color: rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.03); display: flex; flex-direction: column; gap: 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="cpu" style="color: var(--color-primary); width: 16px; height: 16px;"></i>
+                <strong style="color: var(--color-primary); font-size: 0.95rem;">AI Pricing & Trust Analysis</strong>
+              </div>
+              <div style="border-top: 1px dashed var(--border-muted); padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: var(--text-muted);">AI Price Range:</span>
+                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: var(--text-muted);">AI Risk Score:</span>
+                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Specifications -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="glass-card" style="padding: 0.75rem 1rem;">
+                <span class="stat-label" style="font-size: 0.75rem;">Year</span>
+                <div style="font-weight: 600; font-size: 1rem;" id="detail-spec-year">2018</div>
+              </div>
+              <div class="glass-card" style="padding: 0.75rem 1rem;">
+                <span class="stat-label" style="font-size: 0.75rem;">Mileage</span>
+                <div style="font-weight: 600; font-size: 1rem;" id="detail-spec-mileage">45,000 mi</div>
+              </div>
+              <div class="glass-card" style="padding: 0.75rem 1rem;">
+                <span class="stat-label" style="font-size: 0.75rem;">Condition</span>
+                <div style="font-weight: 600; font-size: 1rem;" id="detail-spec-condition">GOOD</div>
+              </div>
+              <div class="glass-card" style="padding: 0.75rem 1rem;">
+                <span class="stat-label" style="font-size: 0.75rem;">Category</span>
+                <div style="font-weight: 600; font-size: 1rem;" id="detail-spec-category">VEHICLES</div>
+              </div>
+            </div>
+            
+            <!-- Seller Details -->
+            <div style="border-top: 1px solid var(--border-muted); padding-top: 1rem;">
+              <span class="stat-label" style="font-size: 0.85rem;">Seller Details</span>
+              <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+                <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-muted); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary);">
+                  <i data-lucide="user" style="width: 18px; height: 18px;"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 600; font-size: 0.95rem;" id="detail-seller-name">John Seller</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);" id="detail-seller-email">seller@verilist.com</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Seller Actions: Edit / Delete -->
+            <div id="detail-seller-actions" class="hidden" style="margin-top: 1rem; display: flex; flex-direction: row; gap: 0.75rem;">
+              <button class="btn btn-secondary" id="detail-edit-btn" style="flex: 1;">
+                <i data-lucide="pencil" style="width:14px;height:14px;"></i>
+                <span>Edit</span>
+              </button>
+              <button class="btn btn-danger" id="detail-delete-btn" style="flex: 1;">
+                <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                <span>Delete</span>
+              </button>
+            </div>
+
+            <!-- Buyer Actions: Make Offer / Instant Buy -->
+            <div id="detail-buyer-actions" class="hidden" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+              <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <input type="number" id="detail-offer-amount" class="form-control" placeholder="Offer Amount ($)" style="flex: 2; margin: 0; background: var(--bg-surface-hover); border: 1px solid var(--border-muted); color: var(--text-primary); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
+                <button class="btn btn-primary" id="detail-offer-btn" style="flex: 3; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                  <i data-lucide="tag" style="width:14px;height:14px;"></i>
+                  <span>Make Offer</span>
+                </button>
+              </div>
+              <button class="btn btn-gold" id="detail-buy-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <i data-lucide="credit-card" style="width:14px;height:14px;"></i>
+                <span>Instant Buy</span>
+              </button>
+            </div>
+            
+          </div>
+        </div>
+        
+        <!-- Similar Listings recommendations section -->
+        <div class="similar-listings-section glass-panel" id="detail-similar-section" style="margin-top: 2rem;">
+          <h3>Similar Active Listings</h3>
+          <div class="similar-listings-grid" id="detail-similar-grid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
       
     </main>
     
@@ -591,24 +835,20 @@
               <div class="listing-price" id="modal-price" style="font-size: 2.2rem; color: var(--text-primary);">$15,000</div>
             </div>
             
-            <div class="glass-card" style="padding: 1.25rem; border-color: rgba(20, 184, 166, 0.2); background: rgba(20, 184, 166, 0.03);">
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                <i data-lucide="shield-check" style="color: var(--color-secondary);"></i>
-                <strong style="color: var(--color-secondary); font-size: 0.95rem;">AI Pricing & Trust Verification</strong>
+            <div class="glass-card" style="padding: 1.25rem; border-color: rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.03); display: flex; flex-direction: column; gap: 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="cpu" style="color: var(--color-primary); width: 16px; height: 16px;"></i>
+                <strong style="color: var(--color-primary); font-size: 0.95rem;">AI Pricing & Trust Analysis</strong>
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-                <span style="font-size: 0.85rem; color: var(--text-secondary);">Market Value Range:</span>
-                <span style="font-weight: 600; font-size: 0.9rem;" id="modal-ai-range">$14,500 - $17,200</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-                <span style="font-size: 0.85rem; color: var(--text-secondary);">Integrity Score:</span>
-                <span class="badge badge-success" id="modal-ai-badge">98% Trust</span>
-              </div>
-              
-              <!-- Anomaly Flags Warning -->
-              <div id="modal-risk-flags-box" class="hidden" style="margin-top: 0.75rem; border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 0.75rem;">
-                <div style="color: var(--status-danger); font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem;">Risk Flags:</div>
-                <div id="modal-risk-flags-list" style="display: flex; flex-direction: column; gap: 0.25rem;"></div>
+              <div style="border-top: 1px dashed var(--border-muted); padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: var(--text-muted);">AI Price Range:</span>
+                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: var(--text-muted);">AI Risk Score:</span>
+                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                </div>
               </div>
             </div>
             
@@ -643,19 +883,6 @@
                   <div style="font-weight: 600; font-size: 0.95rem;" id="modal-seller-name">John Seller</div>
                   <div style="font-size: 0.8rem; color: var(--text-muted);" id="modal-seller-email">seller@verilist.com</div>
                 </div>
-              </div>
-            </div>
-            
-            <!-- Buyer Actions: Bid / Purchase -->
-            <div id="modal-buyer-actions" class="hidden" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
-              <button class="btn btn-primary" id="modal-buy-now-btn" style="width: 100%;">
-                <i data-lucide="shopping-bag"></i>
-                <span>Buy Now (Simulated Stripe)</span>
-              </button>
-              
-              <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <input type="number" id="modal-offer-amount" class="form-input" style="height: 42px;" placeholder="Offer amount ($)">
-                <button class="btn btn-secondary" id="modal-make-offer-btn" style="height: 42px; white-space: nowrap;">Make Offer</button>
               </div>
             </div>
             
@@ -717,13 +944,23 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </button>
           </div>
+          
+          <div style="margin-top: 1.25rem; border-top: 1px dashed var(--border-muted); padding-top: 1.25rem;">
+            <button class="btn btn-primary" style="width: 100%;" id="google-bypass-btn" type="button">
+              <i data-lucide="shield-alert"></i>
+              <span>Bypass / Sign In with Demo Google Account</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
     
   </div>
 
-  <!-- SPA Javascript Logic -->
-  <script src="/app.js"></script>
+  <!-- Real-time Live Activity Feed Toast Notifications -->
+  <div id="activity-feed-container" class="activity-feed-container" style="position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; z-index: 1000; pointer-events: none;"></div>
+
+  <!-- Main App Script (with cache-busting to ensure latest fixes load) -->
+  <script src="app.js?v=2.0"></script>
 </body>
 </html>

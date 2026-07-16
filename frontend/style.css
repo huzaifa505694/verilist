@@ -215,6 +215,9 @@ a:hover {
 }
 
 /* ═══════════════════════════════════════════════
+   NAVBAR — Dynamic Auto-Hide on Scroll
+════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
    NAVBAR
 ════════════════════════════════════════════════ */
 .navbar {
@@ -224,6 +227,13 @@ a:hover {
   max-width: 1320px;
   margin: 0.75rem auto;
   padding: 0 1.5rem;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+/* Hidden state — slides up out of view on scroll down */
+.navbar--hidden {
+  transform: translateY(-150%);
 }
 
 .nav-inner {
@@ -1771,3 +1781,268 @@ select.form-input option { background: hsl(222,47%,8%); }
   transform: translateX(-2px);
   text-shadow: 0 0 8px var(--color-primary-glow);
 }
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD TABLES, DETAIL PAGE & VIEW MODE
+   ════════════════════════════════════════════════ */
+.view-toggles {
+  display: flex;
+  gap: 0.35rem;
+  background: hsla(220,30%,12%,0.6);
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-muted);
+}
+.view-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+.view-toggle-btn:hover {
+  color: var(--text-primary);
+}
+.view-toggle-btn.active {
+  background: var(--color-primary);
+  color: white;
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* List Mode Layout */
+.listings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+.listings-list .listing-card.list-layout {
+  display: flex;
+  flex-direction: row;
+  height: auto;
+  min-height: 200px;
+  overflow: hidden;
+  align-items: stretch;
+}
+.listings-list .listing-card.list-layout .listing-image-placeholder {
+  width: 250px;
+  min-width: 250px;
+  height: auto;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.listings-list .listing-card.list-layout .listing-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-grow: 1;
+  padding: 1.5rem;
+}
+
+/* Dedicated Detailed Page Layout */
+.detail-grid-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+.detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+.detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+.detail-back:hover {
+  color: var(--color-primary-light);
+  transform: translateX(-4px);
+}
+.detail-image-box {
+  width: 100%;
+  height: 380px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-muted);
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.detail-image-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, hsla(213,94%,58%,0.08) 0%, transparent 80%);
+}
+.detail-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.detail-price-tag {
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--color-gold);
+  text-shadow: 0 0 15px var(--color-gold-glow);
+}
+.detail-specs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+.detail-spec-card {
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.detail-spec-card-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.detail-spec-card-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.detail-info-block {
+  padding: 2rem;
+}
+.detail-info-block h3 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.5rem;
+}
+
+/* Dashboard Tables Styling */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-muted);
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+}
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.dashboard-table th {
+  padding: 1rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border-muted);
+  background: hsla(220,30%,12%,0.5);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+.dashboard-table td {
+  padding: 1rem 0.75rem;
+  vertical-align: middle;
+}
+
+/* Responsive Table scroll fix */
+@media (max-width: 768px) {
+  .detail-specs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .detail-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .listings-list .listing-card.list-layout {
+    flex-direction: column;
+  }
+  .listings-list .listing-card.list-layout .listing-image-placeholder {
+    width: 100%;
+    height: 180px;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   PREMIUM WEEK 4 ADVANCED FEATURES STYLES
+   ═══════════════════════════════════════════════ */
+
+/* Live Pricing Gauge Indicator */
+#ai-price-meter-marker {
+  transition: left var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-price-meter-container {
+  padding: 0.5rem 0;
+  position: relative;
+}
+
+/* Diagnostic Accordion Transition */
+#detail-trust-accordion-content {
+  will-change: height;
+}
+
+/* Simulated platform activity feed animations */
+.activity-feed-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.activity-toast {
+  animation: slideInToast 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  backdrop-filter: blur(20px) !important;
+  border-color: rgba(245, 158, 11, 0.2) !important;
+  background: rgba(9, 13, 22, 0.95) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(245, 158, 11, 0.15) !important;
+}
+
+@keyframes slideInToast {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Custom interactive counter offer status indicator badge colors */
+.badge-warning {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #f59e0b !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
