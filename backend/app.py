@@ -125,7 +125,8 @@ LISTING_SCHEMA = {
     'title': {'required': True, 'type': str, 'min_length': 3},
     'description': {'required': True, 'type': str, 'min_length': 10},
     'price': {'required': True, 'type': float, 'min': 0.01},
-    'category': {'type': str, 'allowed': ['VEHICLES', 'PARTS', 'ACCESSORIES']}
+    'category': {'type': str, 'allowed': ['VEHICLES', 'PARTS', 'ACCESSORIES', 'ELECTRONICS']},
+    'status': {'type': str, 'allowed': ['ACTIVE', 'SOLD', 'PENDING_REVIEW', 'REMOVED']}
 }
 
 REVIEW_SCHEMA = {
@@ -220,6 +221,15 @@ def validate_listing_category_fields(data):
                     errors['mileage'] = "Mileage cannot be negative."
             except (ValueError, TypeError):
                 errors['mileage'] = "Mileage must be an integer."
+                
+        if 'condition' in data and data['condition'] is not None:
+            if data['condition'] not in ['EXCELLENT', 'GOOD', 'FAIR', 'POOR']:
+                errors['condition'] = "Condition must be one of EXCELLENT, GOOD, FAIR, POOR."
+    elif category == 'ELECTRONICS':
+        required_fields = ['make', 'model', 'condition']
+        for f in required_fields:
+            if data.get(f) is None:
+                errors[f] = f"Field '{f}' is required for ELECTRONICS category."
                 
         if 'condition' in data and data['condition'] is not None:
             if data['condition'] not in ['EXCELLENT', 'GOOD', 'FAIR', 'POOR']:
@@ -594,6 +604,110 @@ def estimate_preview():
     except Exception as e:
         return jsonify({'error': f'Failed to calculate pricing estimate: {str(e)}'}), 500
 
+# Model Metrics Endpoint (Week 5) — Exposes R², MAE, residual_std, feature importances
+@app.route('/api/ai/model-metrics', methods=['GET'])
+def model_metrics():
+    """Returns trained model performance metrics."""
+    category = request.args.get('category', 'VEHICLES').upper()
+    if category == 'ELECTRONICS':
+        from backend.ai_models.estimator import ElectronicsEstimator
+        model_data = ElectronicsEstimator.get_model_data()
+        if model_data and isinstance(model_data, dict):
+            return jsonify({
+                'model_loaded': True,
+                'r2': round(model_data.get('r2', 0.0), 4),
+                'mae': round(model_data.get('mae', 0.0), 2),
+                'residual_std': round(model_data.get('residual_std', 0.0), 2),
+                'feature_importances': model_data.get('feature_importances', {}),
+                'model_type': 'Extra Trees Regressor (n_estimators=30, max_depth=14)'
+            })
+    else:
+        model_data = PriceEstimator.get_model_data()
+        if model_data and isinstance(model_data, dict):
+            return jsonify({
+                'model_loaded': True,
+                'r2': round(model_data.get('r2', 0.0), 4),
+                'mae': round(model_data.get('mae', 0.0), 2),
+                'residual_std': round(model_data.get('residual_std', 0.0), 2),
+                'feature_importances': model_data.get('feature_importances', {}),
+                'model_type': 'Random Forest Regressor (n_estimators=50, max_depth=18)'
+            })
+    return jsonify({
+        'model_loaded': False,
+        'model_type': 'Fallback Heuristic Depreciation Model'
+    })
+
+# Wrapped prediction endpoint (Week 5)
+@app.route('/predict-price', methods=['POST'])
+def predict_price_endpoint():
+    data = request.get_json() or {}
+    category = data.get('category', 'VEHICLES')
+    year = data.get('year')
+    make = data.get('make')
+    model = data.get('model')
+    mileage = data.get('mileage')
+    condition = data.get('condition')
+    
+    if category == 'VEHICLES':
+        if year is None or make is None or model is None or mileage is None or condition is None:
+            return jsonify({'error': 'Missing required fields for vehicle prediction.'}), 400
+        
+        # Validate and clamp edge cases
+        try:
+            year = int(year)
+            mileage = int(mileage)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'year and mileage must be integers.'}), 400
+        
+        # Clamp year to a reasonable range (dataset coverage: ~1992–2015)
+        year = max(1990, min(year, 2026))
+        # Clamp mileage (0 to 500,000 miles)
+        mileage = max(0, min(mileage, 500000))
+        
+        # Validate condition
+        valid_conditions = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR']
+        condition_upper = str(condition).upper()
+        if condition_upper not in valid_conditions:
+            condition_upper = 'GOOD'  # Default to GOOD for unknown conditions
+            
+        try:
+            pred_price, pred_min, pred_max = PriceEstimator.estimate_price(
+                year, str(make), str(model), mileage, condition_upper
+            )
+            importances = PriceEstimator.get_feature_importances()
+            return jsonify({
+                'predicted_price': pred_price,
+                'range': [pred_min, pred_max],
+                'feature_importance': importances
+            })
+        except Exception as e:
+            return jsonify({'error': f'Failed to predict vehicle price: {str(e)}'}), 500
+            
+    elif category == 'ELECTRONICS':
+        if make is None or model is None or condition is None:
+            return jsonify({'error': 'Missing required fields for electronics prediction.'}), 400
+            
+        valid_conditions = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR']
+        condition_upper = str(condition).upper()
+        if condition_upper not in valid_conditions:
+            condition_upper = 'GOOD'
+            
+        try:
+            from backend.ai_models.estimator import ElectronicsEstimator
+            pred_price, pred_min, pred_max = ElectronicsEstimator.estimate_price(
+                str(make), str(model), condition_upper
+            )
+            importances = ElectronicsEstimator.get_feature_importances()
+            return jsonify({
+                'predicted_price': pred_price,
+                'range': [pred_min, pred_max],
+                'feature_importance': importances
+            })
+        except Exception as e:
+            return jsonify({'error': f'Failed to predict electronics price: {str(e)}'}), 500
+    else:
+        return jsonify({'error': f'Pricing prediction not supported for category: {category}'}), 400
+
 # Listings API
 @app.route('/api/listings', methods=['GET'])
 def list_all():
@@ -660,7 +774,7 @@ def list_all():
 
 @app.route('/api/listings/<id>', methods=['GET'])
 def get_one(id):
-    listing = models.get_listing_by_id(id)
+    listing = models.get_listing_by_id(id, increment_view=True)
     if not listing:
         return jsonify({'error': 'Listing not found.'}), 404
         
@@ -680,9 +794,38 @@ def get_one(id):
     similar.sort(key=lambda x: x[1])
     similar_listings = [item[0] for item in similar[:3]]
     
+    # Retrieve or calculate cached price prediction (Week 5)
+    price_pred = models.get_price_prediction(id)
+    if not price_pred:
+        cat = listing.get('category', 'VEHICLES')
+        if cat == 'VEHICLES':
+            try:
+                pred_price, pred_min, pred_max = PriceEstimator.estimate_price(
+                    listing.get('year'), listing.get('make'), listing.get('model'), listing.get('mileage'), listing.get('condition')
+                )
+                if pred_price is not None:
+                    importances = PriceEstimator.get_feature_importances()
+                    price_pred = models.create_price_prediction(id, pred_price, pred_min, pred_max, importances)
+            except Exception as e:
+                app.logger.error(f"Failed to generate price prediction on view: {str(e)}")
+                price_pred = None
+        elif cat == 'ELECTRONICS':
+            try:
+                from backend.ai_models.estimator import ElectronicsEstimator
+                pred_price, pred_min, pred_max = ElectronicsEstimator.estimate_price(
+                    listing.get('make'), listing.get('model'), listing.get('condition')
+                )
+                if pred_price is not None:
+                    importances = ElectronicsEstimator.get_feature_importances()
+                    price_pred = models.create_price_prediction(id, pred_price, pred_min, pred_max, importances)
+            except Exception as e:
+                app.logger.error(f"Failed to generate electronics price prediction on view: {str(e)}")
+                price_pred = None
+            
     return jsonify({
         'listing': listing,
-        'similar_listings': similar_listings
+        'similar_listings': similar_listings,
+        'price_prediction': price_pred
     })
 
 @app.route('/api/listings', methods=['POST'])
@@ -712,7 +855,7 @@ def create():
     condition = data.get('condition')
         
     # Run the AI Anomaly & Fraud detector on creation
-    analysis = analyze_listing(price, year, make, model, mileage, condition, description)
+    analysis = analyze_listing(price, year, make, model, mileage, condition, description, category)
     
     listing_data = {
         'title': title,
@@ -734,6 +877,25 @@ def create():
     
     listing = models.create_listing(listing_data)
     
+    # Cache price prediction (Week 5)
+    if category == 'VEHICLES':
+        try:
+            pred_price, pred_min, pred_max = PriceEstimator.estimate_price(year, make, model, mileage, condition)
+            if pred_price is not None:
+                importances = PriceEstimator.get_feature_importances()
+                models.create_price_prediction(listing['id'], pred_price, pred_min, pred_max, importances)
+        except Exception as e:
+            app.logger.error(f"Failed to cache price prediction on creation: {str(e)}")
+    elif category == 'ELECTRONICS':
+        try:
+            from backend.ai_models.estimator import ElectronicsEstimator
+            pred_price, pred_min, pred_max = ElectronicsEstimator.estimate_price(make, model, condition)
+            if pred_price is not None:
+                importances = ElectronicsEstimator.get_feature_importances()
+                models.create_price_prediction(listing['id'], pred_price, pred_min, pred_max, importances)
+        except Exception as e:
+            app.logger.error(f"Failed to cache electronics price prediction on creation: {str(e)}")
+        
     if listing['status'] == 'PENDING_REVIEW':
         models.create_notification(
             user_id=request.user['id'],
@@ -789,7 +951,15 @@ def update(id):
     condition = data.get('condition')
     
     # Re-run AI Anomaly & Fraud detector
-    analysis = analyze_listing(price, year, make, model, mileage, condition, description)
+    analysis = analyze_listing(price, year, make, model, mileage, condition, description, category)
+    
+    desired_status = data.get('status')
+    if desired_status in ['SOLD', 'REMOVED']:
+        final_status = desired_status
+    elif analysis['status'] == 'PENDING_REVIEW':
+        final_status = 'PENDING_REVIEW'
+    else:
+        final_status = desired_status if desired_status in ['ACTIVE', 'SOLD', 'PENDING_REVIEW', 'REMOVED'] else 'ACTIVE'
     
     update_data = {
         'title': title,
@@ -801,7 +971,7 @@ def update(id):
         'mileage': mileage,
         'condition': condition,
         'category': category,
-        'status': analysis['status'],
+        'status': final_status,
         'trust_score': analysis['trust_score'],
         'predicted_price_min': analysis['predicted_price_min'],
         'predicted_price_max': analysis['predicted_price_max'],
@@ -811,6 +981,25 @@ def update(id):
     success = models.update_listing(id, update_data)
     if not success:
         return jsonify({'error': 'Failed to update listing.'}), 500
+        
+    # Update cached price prediction (Week 5)
+    if category == 'VEHICLES':
+        try:
+            pred_price, pred_min, pred_max = PriceEstimator.estimate_price(year, make, model, mileage, condition)
+            if pred_price is not None:
+                importances = PriceEstimator.get_feature_importances()
+                models.create_price_prediction(id, pred_price, pred_min, pred_max, importances)
+        except Exception as e:
+            app.logger.error(f"Failed to update cached price prediction: {str(e)}")
+    elif category == 'ELECTRONICS':
+        try:
+            from backend.ai_models.estimator import ElectronicsEstimator
+            pred_price, pred_min, pred_max = ElectronicsEstimator.estimate_price(make, model, condition)
+            if pred_price is not None:
+                importances = ElectronicsEstimator.get_feature_importances()
+                models.create_price_prediction(id, pred_price, pred_min, pred_max, importances)
+        except Exception as e:
+            app.logger.error(f"Failed to update electronics cached price prediction: {str(e)}")
         
     updated = models.get_listing_by_id(id)
     
@@ -926,8 +1115,8 @@ def dashboard_stats():
         active = sum(1 for l in all_seller_listings if l.get('status') == 'ACTIVE')
         sold = sum(1 for l in all_seller_listings if l.get('status') == 'SOLD')
         
-        # 2. Total listing views (mocked logically based on active listings)
-        views = active * random.randint(35, 75) + random.randint(10, 40) if active > 0 else 0
+        # 2. Total listing views (real view count stored in Firestore)
+        views = sum(int(l.get('views', 0)) for l in all_seller_listings)
         # 3. Seller trust rating (average trust score of active/pending listings)
         trust_scores = [l.get('trust_score', 100) for l in all_seller_listings if l.get('trust_score') is not None]
         avg_trust = sum(trust_scores) / len(trust_scores) if len(trust_scores) > 0 else 100.0
@@ -944,17 +1133,20 @@ def dashboard_stats():
         # 1. Count buyer's saved listings
         saved_listings = models.get_saved_listings_for_user(request.user['id'])
         saved = len(saved_listings)
-        # 2. AI Verified checks (mock count of active checked cars)
-        checks = sum(1 for l in saved_listings if l.get('trust_score', 100) >= 80)
-        # 3. Active offers made by buyer
-        offers_ref = db.collection('offers')
-        query = offers_ref.where('buyer_id', '==', request.user['id']).where('status', '==', 'PENDING').stream()
-        offers = sum(1 for _ in query)
+        
+        # 2. Complete offers statistics for Buyer
+        all_buyer_offers = models.get_offers_for_user(request.user['id'], 'BUYER')
+        total_offers = len(all_buyer_offers)
+        accepted_offers = sum(1 for o in all_buyer_offers if o.get('status') == 'ACCEPTED')
+        rejected_offers = sum(1 for o in all_buyer_offers if o.get('status') == 'REJECTED')
+        pending_offers = sum(1 for o in all_buyer_offers if o.get('status') in ['PENDING', 'COUNTER_OFFER'])
         
         stats = {
             'savedListings': saved,
-            'aiVerifiedChecks': checks,
-            'activeOffers': offers
+            'totalOffers': total_offers,
+            'acceptedOffers': accepted_offers,
+            'rejectedOffers': rejected_offers,
+            'pendingOffers': pending_offers
         }
         
     return jsonify({'stats': stats})
@@ -1017,9 +1209,10 @@ def handle_offer_status(id):
     offer = offer_doc.to_dict()
     offer['id'] = offer_doc.id
     
-    listing = models.get_listing_by_id(offer['listing_id'])
-    if not listing:
+    listing_doc = db.collection('listings').document(offer['listing_id']).get()
+    if not listing_doc.exists:
         return jsonify({'error': 'Listing associated with this offer was not found.'}), 404
+    listing = listing_doc.to_dict()
         
     user_id = request.user['id']
     role = request.user['role']
@@ -1036,6 +1229,10 @@ def handle_offer_status(id):
     success = models.update_offer_status(id, status)
     if not success:
         return jsonify({'error': 'Offer status could not be updated.'}), 500
+        
+    # If the offer was accepted, automatically mark the listing as SOLD
+    if status == 'ACCEPTED':
+        models.update_listing_status(offer['listing_id'], 'SOLD')
         
     recipient_id = offer['buyer_id'] if role == 'SELLER' else listing['seller_id']
     models.create_notification(
@@ -1061,9 +1258,10 @@ def make_counter_offer(id):
         return jsonify({'error': 'Offer not found.'}), 404
         
     offer = offer_doc.to_dict()
-    listing = models.get_listing_by_id(offer['listing_id'])
-    if not listing:
+    listing_doc = db.collection('listings').document(offer['listing_id']).get()
+    if not listing_doc.exists:
         return jsonify({'error': 'Listing associated with this offer was not found.'}), 404
+    listing = listing_doc.to_dict()
         
     user_id = request.user['id']
     role = request.user['role']

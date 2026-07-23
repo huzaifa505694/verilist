@@ -121,16 +121,15 @@ def create_listing(listing_data: dict) -> dict:
         'predicted_price_min': float(listing_data['predicted_price_min']) if listing_data.get('predicted_price_min') is not None else None,
         'predicted_price_max': float(listing_data['predicted_price_max']) if listing_data.get('predicted_price_max') is not None else None,
         'risk_flags': listing_data.get('risk_flags', []),
+        'views': 0,
         'price_history': [{'price': float(listing_data['price']), 'date': datetime.datetime.utcnow().isoformat()}],
         'created_at': datetime.datetime.utcnow().isoformat(),
         'updated_at': datetime.datetime.utcnow().isoformat()
     }
     doc_ref.set(data)
     
-    doc = doc_ref.get()
-    res = doc.to_dict()
-    res['id'] = doc.id
-    return res
+    data['id'] = listing_id
+    return data
 
 def get_listings(filters: dict = None, return_total: bool = False) -> list:
     db = get_firestore_db()
@@ -224,13 +223,21 @@ def get_listings(filters: dict = None, return_total: bool = False) -> list:
         return listings, total_count
     return listings
 
-def get_listing_by_id(listing_id: str):
+def get_listing_by_id(listing_id: str, increment_view: bool = False):
     db = get_firestore_db()
     doc_ref = db.collection('listings').document(listing_id)
     doc = doc_ref.get()
     if doc.exists:
         d = doc.to_dict()
         d['id'] = doc.id
+        
+        if increment_view:
+            try:
+                new_views = d.get('views', 0) + 1
+                doc_ref.update({'views': new_views})
+                d['views'] = new_views
+            except Exception:
+                pass
         
         seller = get_user_by_id(d['seller_id'])
         if seller:
@@ -338,106 +345,165 @@ def create_offer(listing_id: str, buyer_id: str, amount: float) -> dict:
     db = get_firestore_db()
     doc_ref = db.collection('offers').document(offer_id)
     data = {
+        'id': offer_id,
         'listing_id': listing_id,
         'buyer_id': buyer_id,
         'amount': float(amount),
         'status': 'PENDING',
         'created_at': datetime.datetime.utcnow().isoformat()
     }
-    doc_ref.set(data)
-    
-    res = doc_ref.get().to_dict()
-    res['id'] = offer_id
-    return res
+    doc_ref.set({k: v for k, v in data.items() if k != 'id'})
+    return data
 
 def get_offers_for_user(user_id: str, role: str) -> list:
     db = get_firestore_db()
     offers_ref = db.collection('offers')
-    
-    # Query database based on role to reduce streaming all offers
-    if role == 'BUYER':
-        query = offers_ref.where('buyer_id', '==', user_id)
-    else:
-        query = offers_ref
-        
-    docs = query.stream()
+    user_cache = {}
     all_offers = []
     
-    # Local caches to prevent redundant Firestore calls inside the loop
-    listing_cache = {}
-    user_cache = {}
-    
-    for doc in docs:
-        o = doc.to_dict()
-        o['id'] = doc.id
-        
-        listing_id = o.get('listing_id')
-        if not listing_id:
-            continue
+    if role == 'SELLER':
+        # 1. Fetch seller's listings first to get matching listing_ids
+        seller_listings_docs = db.collection('listings').where('seller_id', '==', user_id).stream()
+        listing_map = {}
+        for l_doc in seller_listings_docs:
+            ld = l_doc.to_dict()
+            listing_map[l_doc.id] = ld
             
-        if listing_id not in listing_cache:
-            l_doc = db.collection('listings').document(listing_id).get()
-            if l_doc.exists:
-                listing_cache[listing_id] = l_doc.to_dict()
+        if not listing_map:
+            return []
+
+        listing_ids = list(listing_map.keys())
+
+        # 2. Batch query offers by listing_id in chunks of 30
+        offer_docs = []
+        for i in range(0, len(listing_ids), 30):
+            chunk = listing_ids[i:i+30]
+            docs = offers_ref.where('listing_id', 'in', chunk).stream()
+            offer_docs.extend(docs)
+
+        # 3. Batch fetch buyer user names
+        buyer_ids = set()
+        raw_offers = []
+        for doc in offer_docs:
+            o = doc.to_dict()
+            o['id'] = doc.id
+            raw_offers.append(o)
+            if o.get('buyer_id'):
+                buyer_ids.add(o.get('buyer_id'))
+
+        buyer_ids_list = list(buyer_ids)
+        if buyer_ids_list:
+            u_refs = [db.collection('users').document(uid) for uid in buyer_ids_list]
+            u_docs = db.get_all(u_refs)
+            for udoc in u_docs:
+                if udoc.exists:
+                    u_data = udoc.to_dict()
+                    user_cache[udoc.id] = u_data.get('name', 'Unknown')
+
+        for o in raw_offers:
+            l_data = listing_map.get(o.get('listing_id'))
+            if not l_data:
+                continue
+            o['listing_title'] = l_data.get('title', 'Unknown')
+            o['listing_price'] = l_data.get('price', 0.0)
+            b_id = o.get('buyer_id')
+            o['buyer_name'] = user_cache.get(b_id, 'Unknown') if b_id else 'Unknown'
+            all_offers.append(o)
+
+    elif role == 'BUYER':
+        # 1. Query offers for this buyer
+        docs = offers_ref.where('buyer_id', '==', user_id).stream()
+        raw_offers = []
+        listing_ids = set()
+        for doc in docs:
+            o = doc.to_dict()
+            o['id'] = doc.id
+            raw_offers.append(o)
+            if o.get('listing_id'):
+                listing_ids.add(o.get('listing_id'))
+
+        if not raw_offers:
+            return []
+
+        # 2. Batch fetch listings using db.get_all()
+        listing_map = {}
+        seller_ids = set()
+        listing_ids_list = list(listing_ids)
+        if listing_ids_list:
+            l_refs = [db.collection('listings').document(lid) for lid in listing_ids_list]
+            l_docs = db.get_all(l_refs)
+            for ldoc in l_docs:
+                if ldoc.exists:
+                    ld = ldoc.to_dict()
+                    listing_map[ldoc.id] = ld
+                    if ld.get('seller_id'):
+                        seller_ids.add(ld.get('seller_id'))
+
+        # 3. Batch fetch seller names using db.get_all()
+        seller_ids_list = list(seller_ids)
+        if seller_ids_list:
+            u_refs = [db.collection('users').document(uid) for uid in seller_ids_list]
+            u_docs = db.get_all(u_refs)
+            for udoc in u_docs:
+                if udoc.exists:
+                    u_data = udoc.to_dict()
+                    user_cache[udoc.id] = u_data.get('name', 'Unknown')
+
+        for o in raw_offers:
+            l_data = listing_map.get(o.get('listing_id'))
+            if not l_data:
+                # If listing metadata unavailable, keep basic offer info
+                o['listing_title'] = 'Listing'
+                o['listing_price'] = o.get('amount', 0.0)
+                o['seller_name'] = 'Seller'
             else:
-                listing_cache[listing_id] = None
-                
-        listing = listing_cache[listing_id]
-        if not listing:
-            continue
-            
-        o['listing_title'] = listing.get('title', 'Unknown')
-        o['listing_price'] = listing.get('price', 0.0)
-        
-        if role == 'SELLER':
-            if listing.get('seller_id') == user_id:
-                buyer_id = o.get('buyer_id')
-                if buyer_id:
-                    if buyer_id not in user_cache:
-                        buyer_user = get_user_by_id(buyer_id)
-                        user_cache[buyer_id] = buyer_user.get('name', 'Unknown') if buyer_user else 'Unknown'
-                    o['buyer_name'] = user_cache[buyer_id]
-                else:
-                    o['buyer_name'] = 'Unknown'
-                all_offers.append(o)
-        else: # BUYER or ADMIN
-            if o.get('buyer_id') == user_id or role == 'ADMIN':
-                seller_id = listing.get('seller_id')
-                if seller_id:
-                    if seller_id not in user_cache:
-                        seller_user = get_user_by_id(seller_id)
-                        user_cache[seller_id] = seller_user.get('name', 'Unknown') if seller_user else 'Unknown'
-                    o['seller_name'] = user_cache[seller_id]
-                else:
-                    o['seller_name'] = 'Unknown'
-                all_offers.append(o)
-                
+                o['listing_title'] = l_data.get('title', 'Unknown')
+                o['listing_price'] = l_data.get('price', 0.0)
+                s_id = l_data.get('seller_id')
+                o['seller_name'] = user_cache.get(s_id, 'Unknown') if s_id else 'Unknown'
+            all_offers.append(o)
+
+    else: # ADMIN
+        docs = offers_ref.stream()
+        listing_cache = {}
+        for doc in docs:
+            o = doc.to_dict()
+            o['id'] = doc.id
+            listing_id = o.get('listing_id')
+            if not listing_id:
+                continue
+            if listing_id not in listing_cache:
+                l_doc = db.collection('listings').document(listing_id).get()
+                listing_cache[listing_id] = l_doc.to_dict() if l_doc.exists else None
+            listing = listing_cache[listing_id]
+            if not listing:
+                continue
+            o['listing_title'] = listing.get('title', 'Unknown')
+            o['listing_price'] = listing.get('price', 0.0)
+            o['seller_name'] = 'Unknown'
+            o['buyer_name'] = 'Unknown'
+            all_offers.append(o)
+
     all_offers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
     return all_offers
 
 def update_offer_status(offer_id: str, status: str) -> bool:
     db = get_firestore_db()
     doc_ref = db.collection('offers').document(offer_id)
-    doc = doc_ref.get()
-    if doc.exists:
-        doc_ref.update({
-            'status': status
-        })
-        return True
-    return False
+    doc_ref.update({
+        'status': status
+    })
+    return True
 
 def counter_offer(offer_id: str, counter_amount: float, last_action_by: str) -> bool:
     db = get_firestore_db()
     doc_ref = db.collection('offers').document(offer_id)
-    doc = doc_ref.get()
-    if doc.exists:
-        doc_ref.update({
-            'status': 'COUNTER_OFFER',
-            'counter_amount': float(counter_amount),
-            'last_action_by': last_action_by
-        })
-        return True
-    return False
+    doc_ref.update({
+        'status': 'COUNTER_OFFER',
+        'counter_amount': float(counter_amount),
+        'last_action_by': last_action_by
+    })
+    return True
 
 # Review Queries (Firestore)
 def create_review(listing_id: str, reviewer_id: str, seller_id: str, rating: int, comment: str) -> dict:
@@ -502,6 +568,7 @@ def create_notification(user_id: str, title: str, message: str, type_: str = 'SY
     db = get_firestore_db()
     doc_ref = db.collection('notifications').document(notif_id)
     data = {
+        'id': notif_id,
         'user_id': user_id,
         'title': title,
         'message': message,
@@ -509,11 +576,8 @@ def create_notification(user_id: str, title: str, message: str, type_: str = 'SY
         'is_read': 0,
         'created_at': datetime.datetime.utcnow().isoformat()
     }
-    doc_ref.set(data)
-    
-    res = doc_ref.get().to_dict()
-    res['id'] = notif_id
-    return res
+    doc_ref.set({k: v for k, v in data.items() if k != 'id'})
+    return data
 
 def get_notifications_for_user(user_id: str, only_unread: bool = False) -> list:
     db = get_firestore_db()
@@ -557,3 +621,29 @@ def mark_all_notifications_as_read(user_id: str) -> bool:
 # Admin Specific Queries
 def get_all_listings_admin() -> list:
     return get_listings({'status': None})
+
+
+# Price Predictions Cache (Week 5)
+def get_price_prediction(listing_id: str) -> dict:
+    db = get_firestore_db()
+    doc_ref = db.collection('price_predictions').document(listing_id)
+    doc = doc_ref.get()
+    if doc.exists:
+        d = doc.to_dict()
+        d['listing_id'] = doc.id
+        return d
+    return None
+
+def create_price_prediction(listing_id: str, predicted_price: float, min_price: float, max_price: float, feature_importance: dict) -> dict:
+    db = get_firestore_db()
+    doc_ref = db.collection('price_predictions').document(listing_id)
+    data = {
+        'predicted_price': float(predicted_price),
+        'predicted_price_min': float(min_price),
+        'predicted_price_max': float(max_price),
+        'feature_importance': feature_importance,
+        'calculated_at': datetime.datetime.utcnow().isoformat()
+    }
+    doc_ref.set(data)
+    data['listing_id'] = listing_id
+    return data
