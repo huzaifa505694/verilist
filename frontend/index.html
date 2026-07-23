@@ -38,18 +38,62 @@
 </head>
 <body>
 
+  <!-- APP OPENING / SPLASH SCREEN -->
+  <div id="app-splash-screen" class="splash-screen">
+    <div class="splash-curtain splash-curtain-top"></div>
+    <div class="splash-curtain splash-curtain-bottom"></div>
+    
+    <div class="splash-ambient-glow"></div>
+    <div class="splash-grid-pattern"></div>
+    
+    <div class="splash-content">
+      <div class="splash-logo-container">
+        <div class="splash-logo-mark">VL</div>
+        <div class="splash-orbit-ring splash-ring-1"></div>
+        <div class="splash-orbit-ring splash-ring-2"></div>
+        <div class="splash-glow-core"></div>
+      </div>
+      
+      <div class="splash-brand-group">
+        <h1 class="splash-title">VeriList</h1>
+        <div class="splash-badge-pill">
+          <i data-lucide="shield-check" style="width:14px;height:14px;color:var(--color-gold);"></i>
+          <span>AI-VERIFIED SECONDHAND MARKETPLACE</span>
+        </div>
+      </div>
+      
+      <div class="splash-loader-box">
+        <div class="splash-progress-track">
+          <div class="splash-progress-fill" id="splash-progress-bar"></div>
+        </div>
+        <div class="splash-status-container">
+          <span class="splash-status-text" id="splash-status-label">Initializing AI Engine...</span>
+          <span class="splash-status-percent" id="splash-percent-label">0%</span>
+        </div>
+      </div>
+      
+      <div class="splash-hint-text">Click anywhere to skip intro</div>
+    </div>
+  </div>
+
   <div class="app-container">
     
     <!-- NAVIGATION BAR -->
     <nav class="navbar">
       <div class="nav-inner">
-        <div class="nav-logo" id="nav-brand-logo">
+        <div class="nav-logo" id="nav-brand-logo" title="VeriList (Click to view opening)">
           <div class="logo-mark">VL</div>
           <span class="logo-text">VeriList</span>
           <span class="logo-badge">Beta</span>
         </div>
         
         <div class="nav-actions">
+          <!-- Replay Opening Intro Button -->
+          <button class="btn btn-secondary" id="nav-replay-splash-btn" title="Replay Opening Intro Screen" style="font-size: 0.8rem; padding: 0.4rem 0.75rem; border-radius: var(--radius-full);">
+            <i data-lucide="sparkles" style="width:14px;height:14px;color:var(--color-gold);"></i>
+            <span>Intro</span>
+          </button>
+
           <!-- Guest Links -->
           <div id="guest-nav-links" style="display: flex; gap: 0.6rem; align-items: center;">
             <button class="btn btn-secondary" id="nav-login-btn" style="font-size: 0.85rem; padding: 0.45rem 1rem;">
@@ -356,25 +400,28 @@
               </span>
             </div>
           </div>
-          <!-- Seller Dashboard Specific - My Listings Section -->
-          <div id="seller-listings-container" class="hidden" style="margin-top: 2rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-              <h4 style="font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 0.5rem;">
-                <i data-lucide="car" style="width:16px;height:16px;"></i>
-                <span>My Listed Vehicles</span>
-              </h4>
-              <span class="badge badge-gold" id="seller-listings-count">0 Listings</span>
-            </div>
-            <div class="glass-card" style="padding: 1.5rem; overflow-x: auto;">
-              <table class="dashboard-table" style="width:100%; border-collapse: collapse; text-align: left; min-width: 650px;">
+        </div>
+
+        <!-- Seller Dashboard Specific - My Listings Section -->
+        <div id="seller-listings-container" class="hidden" style="margin-top: 2rem; width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <h4 style="font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 0.5rem;">
+              <i data-lucide="package" style="width: 20px; height: 20px; color: var(--color-primary);"></i>
+              <span>My Listed Products & Vehicles</span>
+            </h4>
+            <span class="badge badge-gold" id="seller-listings-count" style="font-size: 0.85rem; padding: 0.4rem 0.85rem;">0 Listings</span>
+          </div>
+          <div class="glass-card" style="padding: 1.75rem; width: 100%; box-sizing: border-box;">
+            <div style="overflow-x: auto; width: 100%;">
+              <table class="dashboard-table" style="width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed;">
                 <thead>
-                  <tr style="border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">
-                    <th style="padding: 0.75rem 0.5rem;">Vehicle Spec</th>
-                    <th style="padding: 0.75rem 0.5rem;">Asking Price</th>
-                    <th style="padding: 0.75rem 0.5rem;">AI Trust Score</th>
-                    <th style="padding: 0.75rem 0.5rem;">Views</th>
-                    <th style="padding: 0.75rem 0.5rem;">Status</th>
-                    <th style="padding: 0.75rem 0.5rem; text-align: right;">Actions</th>
+                  <tr style="border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                    <th style="padding: 0.85rem 0.75rem; width: 38%;">Listing Details</th>
+                    <th style="padding: 0.85rem 0.75rem; width: 14%;">Asking Price</th>
+                    <th style="padding: 0.85rem 0.75rem; width: 14%;">AI Trust Score</th>
+                    <th style="padding: 0.85rem 0.75rem; width: 10%;">Views</th>
+                    <th style="padding: 0.85rem 0.75rem; width: 12%;">Status</th>
+                    <th style="padding: 0.85rem 0.75rem; width: 12%; text-align: right;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="seller-listings-table-body" style="font-size: 0.9rem;">
@@ -395,8 +442,8 @@
         </div>
         <div class="listings-header">
           <div>
-            <h1 id="browse-page-title">Browse Active Listings</h1>
-            <p style="color: var(--text-muted); font-size: 0.95rem;">Explore high-quality vehicles verified by regression models</p>
+            <h1 id="browse-page-title">Cars & Vehicles for Sale</h1>
+            <p id="browse-page-subtitle" style="color: var(--text-muted); font-size: 0.95rem;">Explore high-quality vehicles verified by regression models</p>
           </div>
           <!-- Grid vs List View Toggle -->
           <div class="view-toggle-container" id="browse-view-toggle">
@@ -408,6 +455,22 @@
             </button>
           </div>
         </div>
+
+        <!-- Category Filter Tabs (Separating Cars & Electronics) -->
+        <div class="category-tabs-nav" style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-muted); padding-bottom: 0.75rem; flex-wrap: wrap;">
+          <button class="btn category-tab-btn btn-primary active" id="tab-cat-vehicles" data-category="VEHICLES" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; font-size: 0.9rem;">
+            <i data-lucide="car" style="width: 18px; height: 18px;"></i>
+            <span>Cars & Vehicles</span>
+          </button>
+          <button class="btn category-tab-btn btn-secondary" id="tab-cat-electronics" data-category="ELECTRONICS" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; font-size: 0.9rem;">
+            <i data-lucide="smartphone" style="width: 18px; height: 18px;"></i>
+            <span>Electronics & Devices</span>
+          </button>
+          <button class="btn category-tab-btn btn-secondary" id="tab-cat-all" data-category="ALL" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; font-size: 0.9rem;">
+            <i data-lucide="grid" style="width: 18px; height: 18px;"></i>
+            <span>All Products</span>
+          </button>
+        </div>
         
         <!-- Filter Panel -->
         <div class="filter-panel glass-card">
@@ -415,12 +478,12 @@
             <label class="form-label">Search Keywords</label>
             <div class="input-wrapper">
               <span class="input-icon"><i data-lucide="search" style="width: 16px; height: 16px;"></i></span>
-              <input type="text" id="filter-search" class="form-input" placeholder="e.g. Camry, Mustang...">
+              <input type="text" id="filter-search" class="form-input" placeholder="e.g. Camry, iPhone...">
             </div>
           </div>
           
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label">Make</label>
+            <label class="form-label" id="filter-make-label">Make / Brand</label>
             <select id="filter-make" class="form-input">
               <option value="">All Makes</option>
               <option value="Toyota">Toyota</option>
@@ -497,8 +560,16 @@
                 <input type="text" id="create-title" class="form-input" placeholder="e.g. 2018 Toyota Camry XLE - Clean Title" required>
               </div>
               
-              <div class="form-group">
-                <label class="form-label" htmlFor="create-make">Make</label>
+              <div class="form-group full-width">
+                <label class="form-label" for="create-category">Category</label>
+                <select id="create-category" class="form-input" required>
+                  <option value="VEHICLES">Vehicles (Cars, Trucks, SUVs)</option>
+                  <option value="ELECTRONICS">Electronics (Phones, Consoles, Laptops)</option>
+                </select>
+              </div>
+              
+              <div class="form-group" id="create-make-group">
+                <label class="form-label" for="create-make" id="create-make-label">Make</label>
                 <select id="create-make" class="form-input" required>
                   <option value="">Select Make</option>
                   <option value="Toyota">Toyota</option>
@@ -512,18 +583,18 @@
                 </select>
               </div>
               
-              <div class="form-group">
-                <label class="form-label" htmlFor="create-model">Model</label>
+              <div class="form-group" id="create-model-group">
+                <label class="form-label" for="create-model" id="create-model-label">Model</label>
                 <input type="text" id="create-model" class="form-input" placeholder="e.g. Camry, Civic, Model 3..." required>
               </div>
               
-              <div class="form-group">
-                <label class="form-label" htmlFor="create-year">Year</label>
+              <div class="form-group" id="create-year-group">
+                <label class="form-label" for="create-year" id="create-year-label">Year</label>
                 <input type="number" id="create-year" class="form-input" placeholder="e.g. 2018" min="2010" max="2027" required>
               </div>
               
-              <div class="form-group">
-                <label class="form-label" htmlFor="create-mileage">Mileage (Odometer)</label>
+              <div class="form-group" id="create-mileage-group">
+                <label class="form-label" for="create-mileage" id="create-mileage-label">Mileage (Odometer)</label>
                 <input type="number" id="create-mileage" class="form-input" placeholder="e.g. 45000" min="0" required>
               </div>
               
@@ -539,6 +610,16 @@
               </div>
               
               <div class="form-group">
+                <label class="form-label" for="create-status">Listing Status</label>
+                <select id="create-status" class="form-input">
+                  <option value="ACTIVE">ACTIVE (Listed for Sale)</option>
+                  <option value="SOLD">SOLD (Marked as Sold)</option>
+                  <option value="PENDING_REVIEW">PENDING REVIEW (Draft / Under Review)</option>
+                  <option value="REMOVED">REMOVED (Unlisted / Archived)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
                 <label class="form-label" htmlFor="create-price">Asking Price ($)</label>
                 <div class="input-wrapper">
                   <span class="input-icon">$</span>
@@ -551,7 +632,23 @@
                 <textarea id="create-desc" class="form-input" style="min-height: 120px; resize: vertical;" placeholder="Provide details about the car's history, condition, and specs. Note: Do not include external payment details or direct phone/emails as listings are scanned for transaction integrity." required></textarea>
               </div>
               
-
+              <!-- AI Price Estimation Preview (Week 5) -->
+              <div class="form-group full-width hidden" id="create-ai-estimate-box">
+                <div class="glass-card" style="padding: 1.25rem; border-color: rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.03); display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="background: rgba(59, 130, 246, 0.15); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--color-primary);">
+                      <i data-lucide="cpu" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <div>
+                      <div style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">AI Estimated Price Range</div>
+                      <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-top: 0.15rem;" id="create-ai-estimate-range">$0 - $0</div>
+                    </div>
+                  </div>
+                  <div style="text-align: right;">
+                    <span class="badge badge-success" style="font-weight: 600;" id="create-ai-estimate-badge">Ready</span>
+                  </div>
+                </div>
+              </div>
               
             </div>
             
@@ -613,62 +710,13 @@
               <tr style="border-bottom: 1px solid var(--border-muted); color: var(--text-muted); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">
                 <th style="padding: 0.75rem 0.5rem;">Listing details</th>
                 <th style="padding: 0.75rem 0.5rem;">Seller info</th>
-                <th style="padding: 0.75rem 0.5rem;">Price & AI limits</th>
+                <th style="padding: 0.75rem 0.5rem;">Price &amp; AI limits</th>
                 <th style="padding: 0.75rem 0.5rem;">AI Rating / Flags</th>
                 <th style="padding: 0.75rem 0.5rem; text-align: right;">Audit actions</th>
               </tr>
             </thead>
             <tbody id="admin-audit-table-body" style="font-size: 0.88rem;">
-              <tr style="border-bottom: 1px solid var(--border-subtle);">
-                <td style="padding: 1rem 0.5rem; font-weight: 600;">
-                  2017 Honda Accord Sport
-                  <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-top: 0.15rem;">
-                    Suspiciously low price combined with low mileage indicating potential odometer rollback.
-                  </div>
-                </td>
-                <td style="padding: 1rem 0.5rem; color: var(--text-secondary);">
-                  <div>David Seller</div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">david@example.com</div>
-                </td>
-                <td style="padding: 1rem 0.5rem;">
-                  <div style="font-weight: 700; color: var(--color-rose);">$8,500</div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
-                    AI Range: $13,200 - $15,800
-                  </div>
-                </td>
-                <td style="padding: 1rem 0.5rem;">
-                  <div style="margin-bottom: 0.25rem;"><span class="badge badge-danger" style="font-weight: 700;">45% Trust</span></div>
-                  <div><span class="badge badge-danger" style="font-size: 0.7rem;">Low Price</span></div>
-                </td>
-                <td style="padding: 1rem 0.5rem; text-align: right; color: var(--text-muted); font-style: italic;">
-                  [Wired in Week 6]
-                </td>
-              </tr>
-              <tr style="border-bottom: 1px solid var(--border-subtle);">
-                <td style="padding: 1rem 0.5rem; font-weight: 600;">
-                  2020 Tesla Model Y Long Range
-                  <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-top: 0.15rem;">
-                    Listing description contains suspicious off-platform payment links.
-                  </div>
-                </td>
-                <td style="padding: 1rem 0.5rem; color: var(--text-secondary);">
-                  <div>Elon Mock</div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">mock@example.com</div>
-                </td>
-                <td style="padding: 1rem 0.5rem;">
-                  <div style="font-weight: 700; color: var(--color-rose);">$32,000</div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
-                    AI Range: $31,500 - $36,000
-                  </div>
-                </td>
-                <td style="padding: 1rem 0.5rem;">
-                  <div style="margin-bottom: 0.25rem;"><span class="badge badge-warning" style="font-weight: 700;">68% Trust</span></div>
-                  <div><span class="badge badge-danger" style="font-size: 0.7rem;">Suspicious Text</span></div>
-                </td>
-                <td style="padding: 1rem 0.5rem; text-align: right; color: var(--text-muted); font-style: italic;">
-                  [Wired in Week 6]
-                </td>
-              </tr>
+              <!-- Populated dynamically by app.js renderAdminQueue() -->
             </tbody>
           </table>
         </div>
@@ -718,12 +766,18 @@
               </div>
               <div style="border-top: 1px dashed var(--border-muted); padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span style="color: var(--text-muted);">AI Price Range:</span>
-                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                  <span style="color: var(--text-secondary); font-weight: 500;">AI Predicted Fair Range:</span>
+                  <span style="font-weight: 700; color: var(--color-primary);" id="detail-ai-range">$0 - $0</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span style="color: var(--text-muted);">AI Risk Score:</span>
-                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                  <span style="color: var(--text-secondary); font-weight: 500;">AI Integrity Score:</span>
+                  <span style="font-weight: 700;" id="detail-ai-trust-score">100%</span>
+                </div>
+                <div style="margin-top: 0.5rem; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem;">
+                  <span style="color: var(--text-secondary); font-weight: 600; font-size: 0.82rem; display: block; margin-bottom: 0.4rem;">Why this price? (AI Feature Importance)</span>
+                  <div style="display: flex; flex-direction: column; gap: 0.4rem;" id="detail-ai-importance-container">
+                    <!-- Feature importances populated by JS -->
+                  </div>
                 </div>
               </div>
             </div>
@@ -745,6 +799,14 @@
               <div class="glass-card" style="padding: 0.75rem 1rem;">
                 <span class="stat-label" style="font-size: 0.75rem;">Category</span>
                 <div style="font-weight: 600; font-size: 1rem;" id="detail-spec-category">VEHICLES</div>
+              </div>
+              <div class="glass-card" style="padding: 0.75rem 1rem;">
+                <span class="stat-label" style="font-size: 0.75rem;">Total Views</span>
+                <div style="font-weight: 700; font-size: 1rem; color: var(--color-primary);" id="detail-spec-views">0 views</div>
+              </div>
+              <div class="glass-card" style="padding: 0.75rem 1rem;">
+                <span class="stat-label" style="font-size: 0.75rem;">Listing Status</span>
+                <div style="font-weight: 700; font-size: 1rem;" id="detail-spec-status"><span class="badge badge-blue">ACTIVE</span></div>
               </div>
             </div>
             
@@ -799,6 +861,7 @@
             <!-- Populated dynamically -->
           </div>
         </div>
+      </section>
       
     </main>
     
@@ -842,12 +905,18 @@
               </div>
               <div style="border-top: 1px dashed var(--border-muted); padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span style="color: var(--text-muted);">AI Price Range:</span>
-                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                  <span style="color: var(--text-secondary); font-weight: 500;">AI Predicted Fair Range:</span>
+                  <span style="font-weight: 700; color: var(--color-primary);" id="modal-ai-range">$0 - $0</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span style="color: var(--text-muted);">AI Risk Score:</span>
-                  <span style="font-weight: 500; color: var(--text-muted);">[Placeholder - Wired in Week 5]</span>
+                  <span style="color: var(--text-secondary); font-weight: 500;">AI Integrity Score:</span>
+                  <span style="font-weight: 700;" id="modal-ai-trust-score">100%</span>
+                </div>
+                <div style="margin-top: 0.5rem; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem;">
+                  <span style="color: var(--text-secondary); font-weight: 600; font-size: 0.82rem; display: block; margin-bottom: 0.4rem;">Why this price? (AI Feature Importance)</span>
+                  <div style="display: flex; flex-direction: column; gap: 0.4rem;" id="modal-ai-importance-container">
+                    <!-- Feature importances populated by JS -->
+                  </div>
                 </div>
               </div>
             </div>

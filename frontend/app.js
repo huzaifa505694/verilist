@@ -13,6 +13,7 @@ let state = {
   viewMode: 'grid', // 'grid' or 'list'
   browsePage: 1,
   browseLimit: 6,
+  currentCategoryTab: 'VEHICLES', // 'VEHICLES', 'ELECTRONICS', or 'ALL'
   currentListingId: null,
   detailBackPage: 'browse',
   editingListingId: null,
@@ -52,6 +53,118 @@ const def_events = [
   { id: 'landing-get-started', action: () => navigateTo('register') },
   { id: 'landing-sign-in', action: () => navigateTo('login') }
 ];
+let estimateDebounceTimer = null;
+function debounceGetAIEstimate() {
+  clearTimeout(estimateDebounceTimer);
+  estimateDebounceTimer = setTimeout(handleGetAIEstimate, 400);
+}
+
+async function handleGetAIEstimate() {
+  const category = document.getElementById('create-category').value;
+  const make = document.getElementById('create-make').value;
+  const model = document.getElementById('create-model').value;
+  const yearVal = document.getElementById('create-year').value;
+  const mileageVal = document.getElementById('create-mileage').value;
+  const condition = document.getElementById('create-condition').value;
+  
+  const estimateBox = document.getElementById('create-ai-estimate-box');
+  const rangeEl = document.getElementById('create-ai-estimate-range');
+  const badgeEl = document.getElementById('create-ai-estimate-badge');
+  
+  if (!estimateBox) return;
+  
+  if (category === 'VEHICLES') {
+    if (!make || !model || !yearVal || !mileageVal || !condition) {
+      estimateBox.classList.add('hidden');
+      return;
+    }
+  } else if (category === 'ELECTRONICS') {
+    if (!make || !model || !condition) {
+      estimateBox.classList.add('hidden');
+      return;
+    }
+  } else {
+    estimateBox.classList.add('hidden');
+    return;
+  }
+  
+  const year = parseInt(yearVal);
+  const mileage = parseInt(mileageVal);
+  if (category === 'VEHICLES' && (isNaN(year) || isNaN(mileage))) {
+    estimateBox.classList.add('hidden');
+    return;
+  }
+  
+  estimateBox.classList.remove('hidden');
+  rangeEl.innerText = "Analyzing pricing model...";
+  badgeEl.innerText = "Calculating";
+  badgeEl.className = "badge badge-blue";
+  
+  try {
+    const payload = { category, make, model, condition };
+    if (category === 'VEHICLES') {
+      payload.year = year;
+      payload.mileage = mileage;
+    }
+    const response = await fetch('/predict-price', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const min = data.range[0];
+      const max = data.range[1];
+      rangeEl.innerText = `$${min.toLocaleString()} - $${max.toLocaleString()}`;
+      badgeEl.innerText = "Verified Range";
+      badgeEl.className = "badge badge-success";
+    } else {
+      // Fallback calculation locally
+      let predicted = 150.0;
+      if (category === 'VEHICLES') {
+        const premium_makes = ['Tesla', 'BMW', 'Audi', 'Mercedes', 'Mercedes-Benz', 'Lexus', 'Land Rover'];
+        const base_val = premium_makes.includes(make) ? 55000.0 : 35000.0;
+        const years_old = 2026 - year;
+        let depreciated = base_val - (years_old * (base_val * 0.08));
+        depreciated -= (mileage * 0.12);
+        
+        const condition_factors = {
+          'EXCELLENT': 1.1,
+          'GOOD': 0.95,
+          'FAIR': 0.75,
+          'POOR': 0.5
+        };
+        const factor = condition_factors[condition.toUpperCase()] || 0.9;
+        predicted = Math.max(1000.0, depreciated * factor);
+      } else {
+        const premium_brands = ['Apple', 'Samsung', 'Sony', 'Nintendo'];
+        const base_val = premium_brands.includes(make) ? 500.0 : 150.0;
+        const condition_factors = {
+          'EXCELLENT': 1.0,
+          'GOOD': 0.85,
+          'FAIR': 0.6,
+          'POOR': 0.3
+        };
+        const factor = condition_factors[condition.toUpperCase()] || 0.7;
+        predicted = Math.max(10.0, base_val * factor);
+      }
+      const min = Math.max(5, Math.round(predicted * 0.8));
+      const max = Math.round(predicted * 1.2);
+      
+      rangeEl.innerText = `$${min.toLocaleString()} - $${max.toLocaleString()} (Fallback)`;
+      badgeEl.innerText = "Fallback Mode";
+      badgeEl.className = "badge badge-warning";
+    }
+  } catch (err) {
+    console.error("Failed to fetch AI estimate:", err);
+    rangeEl.innerText = "Failed to communicate with pricing engine.";
+    badgeEl.innerText = "Offline";
+    badgeEl.className = "badge badge-danger";
+  }
+}
+window.handleGetAIEstimate = handleGetAIEstimate;
+
 function initEventListeners() {
   // Navigation & Page Switching links
   def_events.forEach(item => {
@@ -88,7 +201,84 @@ function initEventListeners() {
     });
   }
 
-  // Get AI Estimate live preview in creation form
+  // Get AI Estimate live preview in creation form (Week 5)
+  const categorySelect = document.getElementById('create-category');
+  if (categorySelect) {
+    categorySelect.addEventListener('change', () => {
+      const cat = categorySelect.value;
+      const makeLabel = document.getElementById('create-make-label');
+      const makeSelect = document.getElementById('create-make');
+      const modelLabel = document.getElementById('create-model-label');
+      const modelInput = document.getElementById('create-model');
+      const yearGroup = document.getElementById('create-year-group');
+      const mileageGroup = document.getElementById('create-mileage-group');
+      const yearInput = document.getElementById('create-year');
+      const mileageInput = document.getElementById('create-mileage');
+      
+      if (cat === 'ELECTRONICS') {
+        if (makeLabel) makeLabel.innerText = "Brand";
+        if (makeSelect) {
+          makeSelect.innerHTML = `
+            <option value="">Select Brand</option>
+            <option value="Apple">Apple</option>
+            <option value="Samsung">Samsung</option>
+            <option value="Sony">Sony</option>
+            <option value="Nintendo">Nintendo</option>
+            <option value="Microsoft">Microsoft</option>
+            <option value="HP">HP</option>
+            <option value="Lenovo">Lenovo</option>
+            <option value="Dell">Dell</option>
+            <option value="ASUS">ASUS</option>
+          `;
+        }
+        if (modelLabel) modelLabel.innerText = "Model / Device Type";
+        if (modelInput) modelInput.placeholder = "e.g. iPhone 14 Pro, PlayStation 5, MacBook...";
+        
+        if (yearGroup) yearGroup.classList.add('hidden');
+        if (mileageGroup) mileageGroup.classList.add('hidden');
+        if (yearInput) {
+          yearInput.removeAttribute('required');
+          yearInput.value = "";
+        }
+        if (mileageInput) {
+          mileageInput.removeAttribute('required');
+          mileageInput.value = "";
+        }
+      } else {
+        if (makeLabel) makeLabel.innerText = "Make";
+        if (makeSelect) {
+          makeSelect.innerHTML = `
+            <option value="">Select Make</option>
+            <option value="Toyota">Toyota</option>
+            <option value="Honda">Honda</option>
+            <option value="Ford">Ford</option>
+            <option value="Chevrolet">Chevrolet</option>
+            <option value="Tesla">Tesla</option>
+            <option value="BMW">BMW</option>
+            <option value="Audi">Audi</option>
+            <option value="Mercedes">Mercedes</option>
+          `;
+        }
+        if (modelLabel) modelLabel.innerText = "Model";
+        if (modelInput) modelInput.placeholder = "e.g. Camry, Civic, Model 3...";
+        
+        if (yearGroup) yearGroup.classList.remove('hidden');
+        if (mileageGroup) mileageGroup.classList.remove('hidden');
+        if (yearInput) yearInput.setAttribute('required', 'required');
+        if (mileageInput) mileageInput.setAttribute('required', 'required');
+      }
+      debounceGetAIEstimate();
+    });
+  }
+
+  const createInputs = ['create-category', 'create-make', 'create-model', 'create-year', 'create-mileage', 'create-condition'];
+  createInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', debounceGetAIEstimate);
+      el.addEventListener('change', debounceGetAIEstimate);
+    }
+  });
 
 
   const deleteBtn = document.getElementById('modal-delete-btn');
@@ -241,6 +431,15 @@ function initEventListeners() {
     });
   }
 
+  // Category Filter Tab Listeners (Cars vs Electronics vs All)
+  const tabVehiclesBtn = document.getElementById('tab-cat-vehicles');
+  const tabElectronicsBtn = document.getElementById('tab-cat-electronics');
+  const tabAllBtn = document.getElementById('tab-cat-all');
+
+  if (tabVehiclesBtn) tabVehiclesBtn.addEventListener('click', () => window.switchBrowseCategory('VEHICLES'));
+  if (tabElectronicsBtn) tabElectronicsBtn.addEventListener('click', () => window.switchBrowseCategory('ELECTRONICS'));
+  if (tabAllBtn) tabAllBtn.addEventListener('click', () => window.switchBrowseCategory('ALL'));
+
   // Buyer Action Listeners
   const detailOfferBtn = document.getElementById('detail-offer-btn');
   if (detailOfferBtn) {
@@ -252,6 +451,65 @@ function initEventListeners() {
     detailBuyBtn.addEventListener('click', handleInstantBuy);
   }
 }
+
+// SWITCH BROWSE CATEGORY HELPER
+window.switchBrowseCategory = (category) => {
+  state.currentCategoryTab = category;
+  state.browsePage = 1;
+
+  // Dynamically adjust filter dropdown for Make / Brand based on category
+  const makeSelect = document.getElementById('filter-make');
+  const makeLabel = document.getElementById('filter-make-label');
+  if (makeSelect) {
+    makeSelect.value = '';
+    if (category === 'ELECTRONICS') {
+      if (makeLabel) makeLabel.innerText = "Brand";
+      makeSelect.innerHTML = `
+        <option value="">All Brands</option>
+        <option value="Apple">Apple</option>
+        <option value="Samsung">Samsung</option>
+        <option value="Sony">Sony</option>
+        <option value="Nintendo">Nintendo</option>
+        <option value="Microsoft">Microsoft</option>
+        <option value="HP">HP</option>
+        <option value="Lenovo">Lenovo</option>
+        <option value="Dell">Dell</option>
+        <option value="ASUS">ASUS</option>
+      `;
+    } else if (category === 'VEHICLES') {
+      if (makeLabel) makeLabel.innerText = "Make";
+      makeSelect.innerHTML = `
+        <option value="">All Makes</option>
+        <option value="Toyota">Toyota</option>
+        <option value="Honda">Honda</option>
+        <option value="Ford">Ford</option>
+        <option value="Chevrolet">Chevrolet</option>
+        <option value="Tesla">Tesla</option>
+        <option value="BMW">BMW</option>
+        <option value="Audi">Audi</option>
+        <option value="Mercedes">Mercedes</option>
+      `;
+    } else {
+      if (makeLabel) makeLabel.innerText = "Make / Brand";
+      makeSelect.innerHTML = `
+        <option value="">All Makes & Brands</option>
+        <option value="Toyota">Toyota</option>
+        <option value="Honda">Honda</option>
+        <option value="Ford">Ford</option>
+        <option value="Apple">Apple</option>
+        <option value="Samsung">Samsung</option>
+        <option value="Sony">Sony</option>
+        <option value="Tesla">Tesla</option>
+      `;
+    }
+  }
+
+  if (state.currentPage !== 'browse') {
+    navigateTo('browse');
+  } else {
+    renderBrowse(true);
+  }
+};
 
 // ROUTING & NAVIGATION
 function navigateTo(pageId) {
@@ -349,10 +607,109 @@ function initDynamicNavbar() {
   window.addEventListener('scroll', onScroll, { passive: true });
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// OPENING SPLASH SCREEN & CURTAIN REVEAL CONTROLLER
+// ═══════════════════════════════════════════════════════════════════
+let splashProgressInterval = null;
+let splashDismissed = false;
+
+function initSplashScreen() {
+  const splashEl = document.getElementById('app-splash-screen');
+  const replayBtn = document.getElementById('nav-replay-splash-btn');
+
+  if (splashEl) {
+    splashEl.addEventListener('click', () => {
+      dismissSplashScreen();
+    });
+  }
+
+  if (replayBtn) {
+    replayBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      runSplashScreen();
+    });
+  }
+}
+
+function runSplashScreen() {
+  const splashEl = document.getElementById('app-splash-screen');
+  const progressBar = document.getElementById('splash-progress-bar');
+  const statusLabel = document.getElementById('splash-status-label');
+  const percentLabel = document.getElementById('splash-percent-label');
+
+  if (!splashEl || !progressBar) return;
+
+  splashDismissed = false;
+  if (splashProgressInterval) clearInterval(splashProgressInterval);
+
+  // Setup DOM state
+  document.body.classList.remove('splash-revealed');
+  document.body.classList.add('splash-active');
+  splashEl.classList.remove('splash-opening', 'splash-hidden');
+  progressBar.style.width = '0%';
+  if (percentLabel) percentLabel.innerText = '0%';
+  if (statusLabel) statusLabel.innerText = 'Initializing AI Engine...';
+
+  let currentProgress = 0;
+  const statusSteps = [
+    { pct: 20, text: 'Initializing AI Engine...' },
+    { pct: 50, text: 'Connecting Neural Market Models...' },
+    { pct: 80, text: 'Verifying Marketplace Integrity...' },
+    { pct: 100, text: 'Marketplace Ready' }
+  ];
+
+  splashProgressInterval = setInterval(() => {
+    if (splashDismissed) {
+      clearInterval(splashProgressInterval);
+      return;
+    }
+
+    currentProgress += Math.floor(Math.random() * 4) + 2;
+    if (currentProgress > 100) currentProgress = 100;
+
+    progressBar.style.width = `${currentProgress}%`;
+    if (percentLabel) percentLabel.innerText = `${currentProgress}%`;
+
+    const matchStep = [...statusSteps].reverse().find(s => currentProgress >= s.pct);
+    if (matchStep && statusLabel) {
+      statusLabel.innerText = matchStep.text;
+    }
+
+    if (currentProgress >= 100) {
+      clearInterval(splashProgressInterval);
+      setTimeout(() => {
+        if (!splashDismissed) dismissSplashScreen();
+      }, 700);
+    }
+  }, 100);
+}
+
+function dismissSplashScreen() {
+  if (splashDismissed) return;
+  splashDismissed = true;
+
+  if (splashProgressInterval) clearInterval(splashProgressInterval);
+
+  const splashEl = document.getElementById('app-splash-screen');
+  if (splashEl) {
+    splashEl.classList.add('splash-opening');
+    document.body.classList.remove('splash-active');
+    document.body.classList.add('splash-revealed');
+
+    setTimeout(() => {
+      splashEl.classList.add('splash-hidden');
+    }, 1450);
+  }
+}
+window.runSplashScreen = runSplashScreen;
+window.dismissSplashScreen = dismissSplashScreen;
+
 // CHECK USER SESSION AND INITIALIZATION
 function startApp() {
   initEventListeners();
   initDynamicNavbar();
+  initSplashScreen();
+  runSplashScreen();
   checkAuthSession();
   eagerLoadGoogleConfig(); // Eagerly load Google Client ID
 }
@@ -749,7 +1106,7 @@ async function handleSwitchRole() {
 }
 
 // RENDER DASHBOARD
-async function renderDashboard() {
+async function renderDashboard(silent = false) {
   const container = document.getElementById('dashboard-page');
   container.classList.remove('hidden');
 
@@ -774,7 +1131,9 @@ async function renderDashboard() {
 
   // Load stats
   const statsGrid = document.getElementById('dash-stats-grid');
-  statsGrid.innerHTML = '<div class="loading-container" style="grid-column: 1/-1;"><div class="spinner"></div></div>';
+  if (!silent) {
+    statsGrid.innerHTML = '<div class="loading-container" style="grid-column: 1/-1;"><div class="spinner"></div></div>';
+  }
 
   const sellerListingsContainer = document.getElementById('seller-listings-container');
   if (sellerListingsContainer) {
@@ -833,15 +1192,37 @@ async function renderDashboard() {
         await renderSellerListings();
       } else { // BUYER
         statsGrid.innerHTML = `
-          <div class="stat-card glass-card">
-            <i data-lucide="shopping-bag" style="color: var(--color-primary); width: 24px; height: 24px;"></i>
-            <div class="stat-value">Buyer</div>
-            <div class="stat-label">Account Role</div>
+          <div class="stat-card glass-card" style="border: 1px solid rgba(59, 130, 246, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <i data-lucide="send" style="color: var(--color-primary); width: 24px; height: 24px;"></i>
+              <span class="badge badge-blue">Sent</span>
+            </div>
+            <div class="stat-value" style="font-size: 1.5rem; margin-top: 0.5rem;">${stats.totalOffers || 0}</div>
+            <div class="stat-label">Total Offers Made</div>
           </div>
-          <div class="stat-card glass-card">
-            <i data-lucide="shield-check" style="color: var(--color-secondary); width: 24px; height: 24px;"></i>
-            <div class="stat-value">Active</div>
-            <div class="stat-label">Verification Status</div>
+          <div class="stat-card glass-card" style="border: 1px solid rgba(16, 185, 129, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <i data-lucide="check-circle" style="color: var(--color-emerald); width: 24px; height: 24px;"></i>
+              <span class="badge badge-success">Accepted</span>
+            </div>
+            <div class="stat-value" style="font-size: 1.5rem; margin-top: 0.5rem; color: var(--color-emerald);">${stats.acceptedOffers || 0}</div>
+            <div class="stat-label">Accepted Offers</div>
+          </div>
+          <div class="stat-card glass-card" style="border: 1px solid rgba(245, 158, 11, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <i data-lucide="clock" style="color: var(--color-gold); width: 24px; height: 24px;"></i>
+              <span class="badge badge-gold">Pending</span>
+            </div>
+            <div class="stat-value" style="font-size: 1.5rem; margin-top: 0.5rem; color: var(--color-gold);">${stats.pendingOffers || 0}</div>
+            <div class="stat-label">Pending / Counter</div>
+          </div>
+          <div class="stat-card glass-card" style="border: 1px solid rgba(239, 68, 68, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <i data-lucide="x-circle" style="color: var(--status-danger); width: 24px; height: 24px;"></i>
+              <span class="badge badge-danger">Rejected</span>
+            </div>
+            <div class="stat-value" style="font-size: 1.5rem; margin-top: 0.5rem; color: var(--status-danger);">${stats.rejectedOffers || 0}</div>
+            <div class="stat-label">Rejected Offers</div>
           </div>
         `;
       }
@@ -870,6 +1251,32 @@ async function renderDashboard() {
     if (oldOffers) oldOffers.remove();
   }
 
+  // Load model metrics for dashboard AI card
+  try {
+    const metricsRes = await fetch('/api/ai/model-metrics');
+    if (metricsRes.ok) {
+      const metrics = await metricsRes.json();
+      const modelStatusEl = document.getElementById('dash-model-status');
+      if (modelStatusEl) {
+        if (metrics.model_loaded) {
+          const r2Pct = Math.round(metrics.r2 * 100);
+          modelStatusEl.innerHTML = `
+            <strong style="color: var(--color-emerald);">&#9679; Active:</strong> ${metrics.model_type}<br>
+            <span style="color: var(--text-secondary); font-size: 0.8rem;">
+              R&sup2; Score: <strong>${r2Pct}%</strong> &nbsp;|&nbsp;
+              MAE: <strong>$${metrics.mae.toLocaleString()}</strong> &nbsp;|&nbsp;
+              Residual &sigma;: <strong>$${metrics.residual_std.toLocaleString()}</strong>
+            </span>
+          `;
+        } else {
+          modelStatusEl.innerHTML = `<strong style="color: var(--color-amber);">&#9679; Fallback:</strong> ${metrics.model_type}`;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to load model metrics:", err);
+  }
+
   lucide.createIcons();
 }
 
@@ -881,11 +1288,12 @@ async function renderSellerListings() {
   tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);"><div class="spinner" style="margin: 0 auto; width: 24px; height: 24px;"></div></td></tr>';
 
   try {
-    const res = await fetch(`/api/listings?seller_id=${state.user.id}`);
+    const res = await fetch(`/api/listings?seller_id=${state.user.id}&limit=1000`);
     const data = await res.json();
     if (res.ok) {
       const listings = data.listings;
-      countBadge.innerText = `${listings.length} Listings`;
+      const totalCount = data.total != null ? data.total : listings.length;
+      countBadge.innerText = `${totalCount} Listings`;
       tbody.innerHTML = '';
 
       if (listings.length === 0) {
@@ -902,31 +1310,33 @@ async function renderSellerListings() {
         else if (item.status === 'PENDING_REVIEW') statusClass = 'badge-warning';
         else if (item.status === 'REMOVED') statusClass = 'badge-danger';
 
-        const viewsCount = item.status === 'ACTIVE' ? Math.round(item.trust_score * 1.5 + 12) : 0;
+        const viewsCount = item.views != null ? item.views : 0;
 
         tr.innerHTML = `
-          <td style="padding: 1rem 0.5rem; font-weight: 600; color: var(--text-primary);">
-            <a href="#" onclick="event.preventDefault(); window.navigateToDetail('${item.id}', 'dashboard');" style="color: var(--text-primary); text-decoration: underline;">
+          <td style="padding: 1.1rem 0.85rem; font-weight: 600; color: var(--text-primary);">
+            <a href="#" onclick="event.preventDefault(); window.navigateToDetail('${item.id}', 'dashboard');" style="color: var(--text-primary); text-decoration: underline; font-size: 0.98rem;">
               ${item.title}
             </a>
-            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-top: 0.15rem;">
-              Year: ${item.year} | Mileage: ${item.mileage.toLocaleString()} mi | Condition: ${item.condition}
+            <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400; margin-top: 0.25rem;">
+              ${item.category === 'ELECTRONICS' ? `Brand: ${item.make} | Model: ${item.model} | Condition: ${item.condition}` : `Year: ${item.year} | Mileage: ${item.mileage != null ? item.mileage.toLocaleString() + ' mi' : 'N/A'} | Condition: ${item.condition}`}
             </div>
           </td>
-          <td style="padding: 1rem 0.5rem; color: var(--color-gold); font-weight: 700;">$${item.price.toLocaleString()}</td>
-          <td style="padding: 1rem 0.5rem;">
+          <td style="padding: 1.1rem 0.85rem; color: var(--color-gold); font-weight: 700; font-size: 1.05rem;">$${item.price.toLocaleString()}</td>
+          <td style="padding: 1.1rem 0.85rem;">
             <span class="badge ${item.trust_score >= 80 ? 'badge-success' : 'badge-warning'}">${item.trust_score}%</span>
           </td>
-          <td style="padding: 1rem 0.5rem; color: var(--text-secondary);">${viewsCount} views</td>
-          <td style="padding: 1rem 0.5rem;">
+          <td style="padding: 1.1rem 0.85rem; color: var(--text-secondary); font-size: 0.88rem;">${viewsCount} views</td>
+          <td style="padding: 1.1rem 0.85rem;">
             <span class="badge ${statusClass}">${item.status}</span>
           </td>
-          <td style="padding: 1rem 0.5rem; text-align: right; white-space: nowrap;">
-            <button class="btn btn-secondary" onclick="window.handleEditListing('${item.id}')" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 4px; margin-right: 0.25rem;">
-              <i data-lucide="pencil" style="width: 12px; height: 12px;"></i>
+          <td style="padding: 1.1rem 0.85rem; text-align: right; white-space: nowrap;">
+            <button class="btn btn-secondary" onclick="window.handleEditListing('${item.id}')" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; border-radius: 6px; margin-right: 0.35rem;">
+              <i data-lucide="pencil" style="width: 13px; height: 13px;"></i>
+              <span>Edit</span>
             </button>
-            <button class="btn btn-danger" onclick="window.handleDeleteListingDirect('${item.id}')" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 4px;">
-              <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+            <button class="btn btn-danger" onclick="window.handleDeleteListingDirect('${item.id}')" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; border-radius: 6px;">
+              <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+              <span>Delete</span>
             </button>
           </td>
         `;
@@ -934,10 +1344,10 @@ async function renderSellerListings() {
       });
       lucide.createIcons();
     } else {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--color-rose);">Failed to load listings.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--status-danger);">Error loading listings.</td></tr>';
     }
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--color-rose);">Network error loading listings.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--status-danger);">Error loading listings.</td></tr>';
   }
 }
 
@@ -970,6 +1380,7 @@ window.handleEditListing = async (id) => {
       document.getElementById('create-year').value = listing.year;
       document.getElementById('create-mileage').value = listing.mileage;
       document.getElementById('create-condition').value = listing.condition;
+      document.getElementById('create-status').value = listing.status || 'ACTIVE';
       document.getElementById('create-price').value = listing.price;
       document.getElementById('create-desc').value = listing.description;
 
@@ -1014,7 +1425,30 @@ function renderOffersSection(offers) {
   const oldOffers = document.getElementById('dash-offers-container');
   if (oldOffers) oldOffers.remove();
 
-  if (!offers || offers.length === 0) return;
+  if (!offers || offers.length === 0) {
+    if (state.user && state.user.role === 'BUYER') {
+      const offersContainer = document.createElement('div');
+      offersContainer.id = 'dash-offers-container';
+      offersContainer.className = 'glass-card';
+      offersContainer.style.padding = '2rem';
+      offersContainer.style.marginTop = '2rem';
+      offersContainer.innerHTML = `
+        <h4 class="card-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="message-square"></i>
+          <span>My Submitted Offers</span>
+        </h4>
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          <p style="margin-bottom: 1rem; font-size: 0.95rem;">You have not submitted any offers yet.</p>
+          <button class="btn btn-primary" onclick="window.navigateTo('browse')">Browse Listings & Make an Offer</button>
+        </div>
+      `;
+      const statsGrid = document.getElementById('dash-stats-grid');
+      if (statsGrid && statsGrid.parentNode) {
+        statsGrid.parentNode.insertBefore(offersContainer, statsGrid.nextSibling);
+      }
+    }
+    return;
+  }
 
   const offersContainer = document.createElement('div');
   offersContainer.id = 'dash-offers-container';
@@ -1022,9 +1456,12 @@ function renderOffersSection(offers) {
   offersContainer.style.padding = '2rem';
   offersContainer.style.marginTop = '2rem';
   offersContainer.innerHTML = `
-    <h4 class="card-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-      <i data-lucide="message-square"></i>
-      <span>${state.user.role === 'SELLER' ? 'Offers Received' : 'My Offers'}</span>
+    <h4 class="card-header" style="margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <i data-lucide="message-square" style="color: var(--color-primary);"></i>
+        <span>${state.user.role === 'SELLER' ? 'Offers Received' : 'My Offers & Status'}</span>
+      </div>
+      <span class="badge badge-blue">${offers.length} ${offers.length === 1 ? 'Offer' : 'Offers'}</span>
     </h4>
     <div style="display: flex; flex-direction: column; gap: 1rem;" id="dash-offers-list"></div>
   `;
@@ -1037,46 +1474,59 @@ function renderOffersSection(offers) {
   offers.forEach(o => {
     const item = document.createElement('div');
     item.className = 'glass-card';
-    item.style.padding = '1rem 1.5rem';
+    item.style.padding = '1.25rem 1.5rem';
     item.style.display = 'flex';
     item.style.justifyContent = 'space-between';
     item.style.alignItems = 'center';
     item.style.border = '1px solid var(--border-muted)';
 
     let badgeClass = 'badge-info';
-    if (o.status === 'ACCEPTED') badgeClass = 'badge-success';
-    else if (o.status === 'REJECTED') badgeClass = 'badge-danger';
-    else if (o.status === 'COUNTER_OFFER') badgeClass = 'badge-warning';
+    let badgeText = o.status;
+    if (o.status === 'ACCEPTED') {
+      badgeClass = 'badge-success';
+      badgeText = 'ACCEPTED';
+    } else if (o.status === 'REJECTED') {
+      badgeClass = 'badge-danger';
+      badgeText = 'REJECTED';
+    } else if (o.status === 'COUNTER_OFFER') {
+      badgeClass = 'badge-warning';
+      badgeText = 'COUNTER OFFER';
+    } else if (o.status === 'PENDING') {
+      badgeClass = 'badge-blue';
+      badgeText = 'PENDING SELLER REVIEW';
+    }
 
     let actionsHtml = '';
     if (state.user.role === 'SELLER' && o.status === 'PENDING') {
       actionsHtml = `
-        <div style="display: flex; gap: 0.4rem; flex-wrap: nowrap;">
-          <button class="btn btn-primary" onclick="window.handleOfferAction('${o.id}', 'ACCEPTED')" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;">Accept</button>
-          <button class="btn btn-secondary" onclick="window.handleOfferAction('${o.id}', 'REJECTED')" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;">Reject</button>
+        <div id="offer-actions-${o.id}" style="display: flex; gap: 0.4rem; flex-wrap: nowrap;">
+          <button class="btn btn-primary" onclick="window.handleOfferAction('${o.id}', 'ACCEPTED', event)" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;">Accept</button>
+          <button class="btn btn-secondary" onclick="window.handleOfferAction('${o.id}', 'REJECTED', event)" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;">Reject</button>
           <button class="btn btn-gold" onclick="window.handleOfferCounter('${o.id}')" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;">Counter</button>
         </div>
       `;
     } else if (state.user.role === 'BUYER' && o.status === 'COUNTER_OFFER' && o.last_action_by === 'SELLER') {
       actionsHtml = `
-        <div style="display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-end;">
+        <div id="offer-actions-${o.id}" style="display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-end;">
           <span class="badge badge-warning" style="font-size:0.75rem;">Counter: $${o.counter_amount.toLocaleString()}</span>
-          <button class="btn btn-gold" onclick="window.handleAcceptCounterAndPay('${o.id}', '${o.listing_id}')" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">Accept & Pay</button>
+          <button class="btn btn-gold" onclick="window.handleOfferAction('${o.id}', 'ACCEPTED', event)" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">Accept & Pay</button>
         </div>
       `;
     } else {
-      actionsHtml = `<span class="badge ${badgeClass}">${o.status}</span>`;
+      actionsHtml = `<div id="offer-actions-${o.id}"><span class="badge ${badgeClass}" style="font-weight: 600;">${badgeText}</span></div>`;
     }
 
     const partyLabel = state.user.role === 'SELLER' ? `Buyer: ${o.buyer_name}` : `Seller: ${o.seller_name}`;
+    const listingLink = o.listing_id ? `<a href="#" onclick="event.preventDefault(); window.navigateToDetail('${o.listing_id}', 'dashboard');" style="color: var(--text-primary); text-decoration: underline;">${o.listing_title}</a>` : o.listing_title;
 
     item.innerHTML = `
       <div>
-        <strong style="font-size: 1rem; color: var(--text-primary);">${o.listing_title}</strong>
+        <strong style="font-size: 1rem; color: var(--text-primary);">${listingLink}</strong>
         <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
-          <span>Offer Amount: <strong style="color: var(--color-secondary); font-size: 0.95rem;">$${o.amount.toLocaleString()}</strong></span>
+          <span>My Offer: <strong style="color: var(--color-gold); font-size: 0.95rem;">$${o.amount.toLocaleString()}</strong></span>
           <span style="margin: 0 0.5rem;">|</span>
           <span>${partyLabel}</span>
+          ${o.listing_price ? `<span style="margin: 0 0.5rem;">|</span><span>Listing Price: $${o.listing_price.toLocaleString()}</span>` : ''}
         </div>
       </div>
       <div>${actionsHtml}</div>
@@ -1085,9 +1535,17 @@ function renderOffersSection(offers) {
   });
 }
 
-// HANDLE OFFER STATUS ACTIONS (SELLER)
-async function handleOfferAction(offerId, status) {
-  showLoader("Updating offer...");
+// HANDLE OFFER STATUS ACTIONS (SELLER) - OPTIMISTIC & INSTANT (<1 SEC)
+async function handleOfferAction(offerId, status, event) {
+  // Optimistic UI Update: Immediately update the button container to show the status badge on the spot (<10ms!)
+  const actionsContainer = document.getElementById(`offer-actions-${offerId}`) || (event && event.target && event.target.closest('div'));
+  const previousHtml = actionsContainer ? actionsContainer.innerHTML : null;
+
+  if (actionsContainer) {
+    const badgeClass = status === 'ACCEPTED' ? 'badge-success' : 'badge-danger';
+    actionsContainer.innerHTML = `<span class="badge ${badgeClass}">${status}</span>`;
+  }
+
   try {
     const response = await fetch(`/api/offers/${offerId}/status`, {
       method: 'POST',
@@ -1097,15 +1555,16 @@ async function handleOfferAction(offerId, status) {
 
     if (response.ok) {
       showAlert('success', `Offer successfully ${status.toLowerCase()}!`);
-      renderDashboard();
+      // Background silent refresh of dashboard data without blocking screen or showing full-page loader
+      renderDashboard(true);
     } else {
       const data = await response.json();
       showAlert('danger', data.error || 'Failed to update offer.');
+      if (actionsContainer && previousHtml) actionsContainer.innerHTML = previousHtml;
     }
   } catch (err) {
     showAlert('danger', 'Server connection error.');
-  } finally {
-    hideLoader();
+    if (actionsContainer && previousHtml) actionsContainer.innerHTML = previousHtml;
   }
 }
 window.handleOfferAction = handleOfferAction; // Expose globally for inline onclick
@@ -1122,8 +1581,38 @@ async function renderBrowse(keepFilters = false) {
   // Restore filter panel visibility for Browse page
   document.querySelector('.filter-panel').classList.remove('hidden');
 
-  // Set Browse title
-  document.getElementById('browse-page-title').innerText = "Browse Active Listings";
+  // Synchronize Tab active states
+  const tabVehicles = document.getElementById('tab-cat-vehicles');
+  const tabElectronics = document.getElementById('tab-cat-electronics');
+  const tabAll = document.getElementById('tab-cat-all');
+
+  const currentTab = state.currentCategoryTab || 'VEHICLES';
+
+  if (tabVehicles) {
+    tabVehicles.className = `btn category-tab-btn ${currentTab === 'VEHICLES' ? 'btn-primary active' : 'btn-secondary'}`;
+  }
+  if (tabElectronics) {
+    tabElectronics.className = `btn category-tab-btn ${currentTab === 'ELECTRONICS' ? 'btn-primary active' : 'btn-secondary'}`;
+  }
+  if (tabAll) {
+    tabAll.className = `btn category-tab-btn ${currentTab === 'ALL' ? 'btn-primary active' : 'btn-secondary'}`;
+  }
+
+  // Update Page Title and Subtitle based on active Category Tab
+  const titleEl = document.getElementById('browse-page-title');
+  const subtitleEl = document.getElementById('browse-page-subtitle');
+  if (titleEl) {
+    if (currentTab === 'VEHICLES') {
+      titleEl.innerText = "Cars & Vehicles for Sale";
+      if (subtitleEl) subtitleEl.innerText = "Explore high-quality cars & vehicles verified by AI regression models";
+    } else if (currentTab === 'ELECTRONICS') {
+      titleEl.innerText = "Electronics & Devices for Sale";
+      if (subtitleEl) subtitleEl.innerText = "Explore smartphones, laptops, consoles & appliances verified by AI models";
+    } else {
+      titleEl.innerText = "Browse All Marketplace Products";
+      if (subtitleEl) subtitleEl.innerText = "Explore all secondhand items verified for pricing integrity";
+    }
+  }
 
   const search = document.getElementById('filter-search').value;
   const make = document.getElementById('filter-make').value;
@@ -1135,8 +1624,11 @@ async function renderBrowse(keepFilters = false) {
   grid.innerHTML = '<div class="loading-container" style="grid-column: 1/-1;"><div class="spinner"></div></div>';
 
   try {
-    // Build query params with pagination
+    // Build query params with pagination and Category filtering
     let url = `/api/listings?page=${state.browsePage}&limit=${state.browseLimit}&`;
+    if (currentTab && currentTab !== 'ALL') {
+      url += `category=${currentTab}&`;
+    }
     if (search) url += `search=${encodeURIComponent(search)}&`;
     if (make) url += `make=${encodeURIComponent(make)}&`;
     if (condition) url += `condition=${encodeURIComponent(condition)}&`;
@@ -1159,7 +1651,8 @@ async function renderBrowse(keepFilters = false) {
       }
 
       if (listings.length === 0) {
-        grid.innerHTML = '<p style="color: var(--text-muted); text-align: center; grid-column: 1/-1; padding: 3rem;">No active listings match your criteria.</p>';
+        const catLabel = currentTab === 'VEHICLES' ? 'cars or vehicles' : currentTab === 'ELECTRONICS' ? 'electronics or devices' : 'listings';
+        grid.innerHTML = `<p style="color: var(--text-muted); text-align: center; grid-column: 1/-1; padding: 3rem;">No active ${catLabel} match your criteria.</p>`;
         document.getElementById('listings-pagination').innerHTML = '';
         return;
       }
@@ -1169,9 +1662,11 @@ async function renderBrowse(keepFilters = false) {
         card.className = `glass-card listing-card ${state.viewMode === 'list' ? 'list-layout' : ''}`;
         card.style.cursor = 'pointer';
 
+        const cardIcon = item.category === 'ELECTRONICS' ? 'smartphone' : 'car';
+
         card.innerHTML = `
           <div class="listing-image-placeholder" onclick="window.navigateToDetail('${item.id}', 'browse')">
-            <i data-lucide="car" style="width: 48px; height: 48px; opacity: 0.25;"></i>
+            <i data-lucide="${cardIcon}" style="width: 48px; height: 48px; opacity: 0.25;"></i>
           </div>
           <div class="listing-content" onclick="window.navigateToDetail('${item.id}', 'browse')">
             <div class="listing-card-main-info" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
@@ -1181,9 +1676,14 @@ async function renderBrowse(keepFilters = false) {
             
             <div class="listings-specs-wrapper" style="margin-top: 0.4rem; margin-bottom: 0.4rem;">
               <div class="listing-specs">
-                <div class="listing-spec-item"><i data-lucide="calendar" style="width: 14px;"></i><span>${item.year}</span></div>
-                <div class="listing-spec-item"><i data-lucide="gauge" style="width: 14px;"></i><span>${item.mileage.toLocaleString()} mi</span></div>
-                <div class="listing-spec-item"><i data-lucide="star" style="width: 14px;"></i><span>${item.condition}</span></div>
+                ${item.category === 'ELECTRONICS' ? `
+                  <div class="listing-spec-item"><i data-lucide="tag" style="width: 14px;"></i><span>${item.make}</span></div>
+                  <div class="listing-spec-item"><i data-lucide="star" style="width: 14px;"></i><span>${item.condition}</span></div>
+                ` : `
+                  <div class="listing-spec-item"><i data-lucide="calendar" style="width: 14px;"></i><span>${item.year}</span></div>
+                  <div class="listing-spec-item"><i data-lucide="gauge" style="width: 14px;"></i><span>${item.mileage != null ? item.mileage.toLocaleString() : '0'} mi</span></div>
+                  <div class="listing-spec-item"><i data-lucide="star" style="width: 14px;"></i><span>${item.condition}</span></div>
+                `}
               </div>
             </div>
             
@@ -1298,6 +1798,99 @@ async function renderAdminQueue() {
   } catch (err) {
     console.error("Failed to load admin stats:", err);
   }
+
+  // Load flagged listings from Firestore via admin API
+  const tbody = document.getElementById('admin-audit-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-muted);"><div class="spinner" style="margin: 0 auto; width: 24px; height: 24px;"></div></td></tr>';
+
+  try {
+    const listingsRes = await fetch('/api/admin/listings');
+    const listingsData = await listingsRes.json();
+
+    if (listingsRes.ok) {
+      let allListings = listingsData.listings || [];
+
+      // Filter to PENDING_REVIEW only, and apply optional category filter
+      let flagged = allListings.filter(l => l.status === 'PENDING_REVIEW');
+      if (state.adminCategoryFilter) {
+        flagged = flagged.filter(l => l.category === state.adminCategoryFilter);
+      }
+
+      tbody.innerHTML = '';
+
+      if (flagged.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2.5rem; color: var(--text-muted); font-style: italic;">No flagged listings found${state.adminCategoryFilter ? ` for category "${state.adminCategoryFilter}"` : ''}. All listings are clean!</td></tr>`;
+        lucide.createIcons();
+        return;
+      }
+
+      flagged.forEach(item => {
+        const trustScore = item.trust_score || 0;
+        let trustBadgeClass = 'badge-success';
+        if (trustScore < 50) trustBadgeClass = 'badge-danger';
+        else if (trustScore < 75) trustBadgeClass = 'badge-warning';
+
+        const flags = Array.isArray(item.risk_flags) ? item.risk_flags : [];
+        const flagBadges = flags.length > 0
+          ? flags.map(f => `<span class="badge badge-danger" style="font-size: 0.7rem; margin-top: 0.2rem; display: inline-block;">${f}</span>`).join('')
+          : '<span class="badge badge-info" style="font-size: 0.7rem;">Unknown risk</span>';
+
+        const aiMin = item.predicted_price_min != null ? `$${Math.round(item.predicted_price_min).toLocaleString()}` : 'N/A';
+        const aiMax = item.predicted_price_max != null ? `$${Math.round(item.predicted_price_max).toLocaleString()}` : 'N/A';
+        const askingColor = (item.predicted_price_min && item.price < item.predicted_price_min * 0.7)
+          ? 'var(--color-rose)' : 'var(--text-primary)';
+
+        const createdDate = item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border-subtle)';
+        tr.innerHTML = `
+          <td style="padding: 1rem 0.5rem; font-weight: 600; color: var(--text-primary); max-width: 280px;">
+            <a href="#" onclick="event.preventDefault(); window.navigateToDetail('${item.id}', 'admin');" style="color: var(--text-primary); text-decoration: underline;">${item.title}</a>
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-top: 0.2rem; line-height: 1.4;">
+              ${item.category === 'ELECTRONICS' ? `${item.make || ''} ${item.model || ''} | ${item.condition || ''}` : `${item.year || ''} ${item.make || ''} ${item.model || ''} | ${(item.mileage || 0).toLocaleString()} mi | ${item.condition || ''}`}
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.1rem;">Posted: ${createdDate}</div>
+          </td>
+          <td style="padding: 1rem 0.5rem; color: var(--text-secondary); min-width: 140px;">
+            <div style="font-weight: 500;">${item.seller_name || 'Unknown'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${item.seller_email || ''}</div>
+          </td>
+          <td style="padding: 1rem 0.5rem; min-width: 160px;">
+            <div style="font-weight: 700; color: ${askingColor}; font-size: 1.05rem;">$${item.price.toLocaleString()}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">AI Range: ${aiMin} – ${aiMax}</div>
+          </td>
+          <td style="padding: 1rem 0.5rem; min-width: 140px;">
+            <div style="margin-bottom: 0.3rem;">
+              <span class="badge ${trustBadgeClass}" style="font-weight: 700;">${trustScore}% Trust</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.15rem;">${flagBadges}</div>
+          </td>
+          <td style="padding: 1rem 0.5rem; text-align: right; white-space: nowrap;">
+            <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
+              <button class="btn btn-primary" onclick="window.handleApproveListing('${item.id}')" style="padding: 0.4rem 0.85rem; font-size: 0.78rem;">
+                <i data-lucide="check" style="width: 13px; height: 13px;"></i>
+                <span>Approve</span>
+              </button>
+              <button class="btn btn-danger" onclick="window.handleRejectListing('${item.id}')" style="padding: 0.4rem 0.85rem; font-size: 0.78rem;">
+                <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                <span>Reject</span>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--color-rose);">Failed to load flagged listings.</td></tr>`;
+    }
+  } catch (err) {
+    console.error("Failed to load flagged listings:", err);
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--color-rose);">Network error loading listings.</td></tr>`;
+  }
+
   lucide.createIcons();
 }
 
@@ -1439,14 +2032,19 @@ function resetCreateForm() {
 // CREATE / EDIT LISTING PUBLICATION
 async function handleCreateListing(e) {
   e.preventDefault();
+  const category = document.getElementById('create-category').value;
   const title = document.getElementById('create-title').value;
   const make = document.getElementById('create-make').value;
   const model = document.getElementById('create-model').value;
-  const year = parseInt(document.getElementById('create-year').value);
-  const mileage = parseInt(document.getElementById('create-mileage').value);
+  const yearVal = document.getElementById('create-year').value;
+  const mileageVal = document.getElementById('create-mileage').value;
   const condition = document.getElementById('create-condition').value;
+  const status = document.getElementById('create-status').value;
   const price = parseFloat(document.getElementById('create-price').value);
   const description = document.getElementById('create-desc').value;
+
+  const year = category === 'VEHICLES' ? parseInt(yearVal) : null;
+  const mileage = category === 'VEHICLES' ? parseInt(mileageVal) : null;
 
   const isEdit = !!state.editingListingId;
   const method = isEdit ? 'PUT' : 'POST';
@@ -1458,7 +2056,7 @@ async function handleCreateListing(e) {
     const response = await fetch(url, {
       method: method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, make, model, year, mileage, condition, price, description })
+      body: JSON.stringify({ category, title, make, model, year, mileage, condition, status, price, description })
     });
 
     const data = await response.json();
@@ -1479,6 +2077,76 @@ async function handleCreateListing(e) {
     hideLoader();
   }
 }
+// AI ANALYSIS RENDERER (Week 5) — populates the AI Pricing & Trust panel
+// prefix: 'detail' or 'modal'
+function renderAIAnalysis(pricePrediction, trustScore, prefix) {
+  const rangeEl = document.getElementById(`${prefix}-ai-range`);
+  const trustEl = document.getElementById(`${prefix}-ai-trust-score`);
+  const importanceContainer = document.getElementById(`${prefix}-ai-importance-container`);
+
+  // Price range
+  if (rangeEl) {
+    if (pricePrediction && pricePrediction.predicted_price_min != null) {
+      const min = Math.round(pricePrediction.predicted_price_min).toLocaleString();
+      const max = Math.round(pricePrediction.predicted_price_max).toLocaleString();
+      rangeEl.innerText = `$${min} – $${max}`;
+      rangeEl.style.color = 'var(--color-primary)';
+    } else {
+      rangeEl.innerText = 'N/A';
+      rangeEl.style.color = 'var(--text-muted)';
+    }
+  }
+
+  // Trust/Integrity score
+  if (trustEl) {
+    const score = trustScore != null ? Math.round(trustScore) : null;
+    if (score != null) {
+      trustEl.innerText = `${score}%`;
+      if (score >= 85) {
+        trustEl.style.color = 'var(--color-emerald)';
+      } else if (score >= 65) {
+        trustEl.style.color = 'var(--color-amber)';
+      } else {
+        trustEl.style.color = 'var(--color-rose)';
+      }
+    } else {
+      trustEl.innerText = 'N/A';
+      trustEl.style.color = 'var(--text-muted)';
+    }
+  }
+
+  // Feature importance bars
+  if (importanceContainer) {
+    importanceContainer.innerHTML = '';
+    const importances = pricePrediction && pricePrediction.feature_importances;
+    if (importances && Object.keys(importances).length > 0) {
+      const labels = { year: 'Year', odometer: 'Mileage', condition: 'Condition', make: 'Make', model: 'Model' };
+      const sortedEntries = Object.entries(importances)
+        .sort((a, b) => b[1] - a[1]);
+      const maxVal = sortedEntries[0][1];
+
+      sortedEntries.forEach(([feature, value]) => {
+        const pct = Math.round((value / maxVal) * 100);
+        const display = Math.round(value * 100);
+        const label = labels[feature] || feature.charAt(0).toUpperCase() + feature.slice(1);
+        const barHue = pct > 60 ? 'var(--color-primary)' : pct > 30 ? 'var(--color-amber)' : 'var(--text-muted)';
+
+        importanceContainer.insertAdjacentHTML('beforeend', `
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="min-width: 68px; font-size: 0.78rem; color: var(--text-secondary); font-weight: 500;">${label}</span>
+            <div style="flex: 1; height: 6px; background: var(--border-muted); border-radius: 99px; overflow: hidden;">
+              <div style="height: 100%; width: ${pct}%; background: ${barHue}; border-radius: 99px; transition: width 0.4s ease;"></div>
+            </div>
+            <span style="min-width: 32px; font-size: 0.78rem; color: var(--text-secondary); text-align: right;">${display}%</span>
+          </div>
+        `);
+      });
+    } else {
+      importanceContainer.innerHTML = `<span style="color: var(--text-muted); font-size: 0.8rem;">Feature data not available.</span>`;
+    }
+  }
+}
+
 // DEDICATED DETAIL PAGE RENDERER
 async function renderListingDetail(listingId) {
   const page = document.getElementById('detail-page');
@@ -1508,10 +2176,31 @@ async function renderListingDetail(listingId) {
       document.getElementById('detail-description').innerText = listing.description;
 
       // Specs
-      document.getElementById('detail-spec-year').innerText = listing.year;
-      document.getElementById('detail-spec-mileage').innerText = `${listing.mileage.toLocaleString()} mi`;
-      document.getElementById('detail-spec-condition').innerText = listing.condition;
-      document.getElementById('detail-spec-category').innerText = listing.category;
+      const yearEl = document.getElementById('detail-spec-year');
+      const mileageEl = document.getElementById('detail-spec-mileage');
+      
+      if (listing.category === 'ELECTRONICS') {
+        if (yearEl) yearEl.innerText = 'N/A';
+        if (mileageEl) mileageEl.innerText = 'N/A';
+      } else {
+        if (yearEl) yearEl.innerText = listing.year || 'N/A';
+        if (mileageEl) mileageEl.innerText = listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : 'N/A';
+      }
+      
+      document.getElementById('detail-spec-condition').innerText = listing.condition || 'N/A';
+      document.getElementById('detail-spec-category').innerText = listing.category || 'N/A';
+
+      const viewsEl = document.getElementById('detail-spec-views');
+      if (viewsEl) viewsEl.innerText = `${listing.views != null ? listing.views : 0} views`;
+
+      const statusEl = document.getElementById('detail-spec-status');
+      if (statusEl) {
+        let badgeClass = 'badge-blue';
+        if (listing.status === 'SOLD') badgeClass = 'badge-success';
+        else if (listing.status === 'PENDING_REVIEW') badgeClass = 'badge-warning';
+        else if (listing.status === 'REMOVED') badgeClass = 'badge-danger';
+        statusEl.innerHTML = `<span class="badge ${badgeClass}">${listing.status || 'ACTIVE'}</span>`;
+      }
 
       // Seller Info
       document.getElementById('detail-seller-name').innerText = listing.seller_name;
@@ -1537,6 +2226,10 @@ async function renderListingDetail(listingId) {
       }
 
       renderRecommendationsDetail(data.similar_listings);
+      
+      // Render AI Pricing & Trust Analysis (Week 5)
+      renderAIAnalysis(data.price_prediction, listing.trust_score, 'detail');
+      renderAIAnalysis(data.price_prediction, listing.trust_score, 'modal');
     }
   } catch (err) {
     console.error("Failed to load listing detail page:", err);
@@ -1603,9 +2296,13 @@ function renderRecommendationsDetail(similar) {
       <strong style="color: var(--text-primary); font-size: 0.95rem; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.title}</strong>
       <div style="font-size: 1.1rem; font-weight: 700; color: var(--color-secondary); margin-top: 0.25rem;">$${item.price.toLocaleString()}</div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; display: flex; gap: 0.5rem;">
-        <span>${item.year}</span>
-        <span>•</span>
-        <span>${item.mileage.toLocaleString()} mi</span>
+        ${item.category === 'ELECTRONICS' ? `
+          <span>${item.condition}</span>
+        ` : `
+          <span>${item.year}</span>
+          <span>•</span>
+          <span>${item.mileage != null ? item.mileage.toLocaleString() + ' mi' : 'N/A'}</span>
+        `}
       </div>
     `;
     card.addEventListener('click', () => {
