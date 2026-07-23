@@ -34,7 +34,7 @@ def check_for_contact_info(text: str) -> bool:
         return True
     return False
 
-def analyze_listing(price: float, year: int, make: str, model: str, mileage: int, condition: str, description: str) -> dict:
+def analyze_listing(price: float, year: int, make: str, model: str, mileage: int, condition: str, description: str, category: str = 'VEHICLES') -> dict:
     """
     Analyzes listing data for pricing anomalies, mileage anomalies, and scam text patterns.
     
@@ -48,27 +48,42 @@ def analyze_listing(price: float, year: int, make: str, model: str, mileage: int
         }
     """
     # 1. Get fair price estimate range
-    pred_price, pred_min, pred_max = PriceEstimator.estimate_price(year, make, model, mileage, condition)
+    pred_price, pred_min, pred_max = None, None, None
+    if category == 'VEHICLES':
+        if not (year is None or make is None or model is None or mileage is None or condition is None):
+            try:
+                pred_price, pred_min, pred_max = PriceEstimator.estimate_price(year, make, model, mileage, condition)
+            except Exception as e:
+                pass
+    elif category == 'ELECTRONICS':
+        if not (make is None or model is None or condition is None):
+            try:
+                from backend.ai_models.estimator import ElectronicsEstimator
+                pred_price, pred_min, pred_max = ElectronicsEstimator.estimate_price(make, model, condition)
+            except Exception as e:
+                pass
     
     risk_flags = []
     trust_score = 100
     
     # 2. Check Price Deviation (Suspiciously Low Price)
-    if price < (0.7 * pred_min):
-        risk_flags.append("Suspiciously Low Price (Potential Scam)")
-        trust_score -= 40
-    elif price > (1.4 * pred_max):
-        risk_flags.append("Inflated Asking Price")
-        trust_score -= 15
+    if pred_min is not None and pred_max is not None:
+        if price < (0.7 * pred_min):
+            risk_flags.append("Suspiciously Low Price (Potential Scam)")
+            trust_score -= 40
+        elif price > (1.4 * pred_max):
+            risk_flags.append("Inflated Asking Price")
+            trust_score -= 15
         
     # 3. Check Mileage-Age Anomaly (Odometer Rollback check)
-    current_year = 2026
-    age = current_year - int(year)
-    if age > 2:
-        miles_per_year = float(mileage) / age
-        if miles_per_year < 800:
-            risk_flags.append("Anomaly: Unusually Low Mileage for Age (Odometer Check)")
-            trust_score -= 30
+    if year is not None and mileage is not None:
+        current_year = 2026
+        age = current_year - int(year)
+        if age > 2:
+            miles_per_year = float(mileage) / age
+            if miles_per_year < 800:
+                risk_flags.append("Anomaly: Unusually Low Mileage for Age (Odometer Check)")
+                trust_score -= 30
             
     # 4. Check description text for payment scam terms
     if scan_text_for_scams(description):
